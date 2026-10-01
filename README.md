@@ -57,7 +57,7 @@ The terminal progressively unlocks as each requirement is met.
 
 | Component | Role |
 |---|---|
-| **Terminal** | The user's personal Bloom interface — status, progress, workers, rewards |
+| **Terminal** | The user's personal Bloom interface status, progress, workers, rewards |
 | **Agents** | Verified participants a user brings in during whitelist onboarding |
 | **Workers** | User-owned, configured units deployed to a market to generate rewards |
 | **Market** | Tokenized-market assets or categories that workers focus on |
@@ -139,7 +139,7 @@ The terminal must always show whether the wallet is successfully bound.
 
 ## Whitelist & Missions
 
-The whitelist is an application process, not a static address list. Missions are **modular** — they can be added, removed, or scheduled from the backend without frontend rebuilds.
+The whitelist is an application process, not a static address list. Missions are **modular** they can be added, removed, or scheduled from the backend without frontend rebuilds.
 
 | Type | Examples |
 |---|---|
@@ -232,7 +232,7 @@ stateDiagram-v2
   PAUSED --> ACTIVE
 ```
 
-Paused workers never disappear — their history stays visible.
+Paused workers never disappear, their history stays visible.
 
 ---
 
@@ -452,7 +452,7 @@ Items to settle before or during the technical spec:
 
 ## Positioning
 
-Not *"a Robinhood watcher"* — the market watcher is one component.
+Not *"a Robinhood watcher"* , the market watcher is one component.
 
 > **Bloom Terminal is an onchain market intelligence platform where users deploy autonomous workers to monitor tokenized markets and earn Bloom rewards.**
 
