@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌸 Bloom Terminal
+#  Bloom Terminal
 
 **Build your terminal. Deploy your agent. Put it to work.**
 
