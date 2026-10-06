@@ -1,12 +1,16 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { SignInModal } from "@/components/SignInModal";
+import { useTerminal } from "@/state/terminal";
 import { HERO, LOGO } from "@/lib/art";
 
 export default function Landing() {
-  const navigate = useNavigate();
+  const { xConnected, authLoading } = useTerminal();
   const [signingIn, setSigningIn] = useState(false);
+
+  // Already signed in → go straight to the app.
+  if (!authLoading && xConnected) return <Navigate to="/app" replace />;
 
   return (
     <div className="mx-auto flex min-h-full max-w-3xl flex-col items-center px-5 py-8 text-center">
@@ -29,23 +33,11 @@ export default function Landing() {
         Watch it bloom.
       </h1>
 
-      <p className="mt-4 max-w-md text-ink-soft">
-        Give a little TV a job watching the markets. It earns Bloom while you
-        are away. Mint later to multiply what it makes.
-      </p>
-
       <Button variant="pink" size="lg" className="mt-8" onClick={() => setSigningIn(true)}>
         Register a Worker
       </Button>
 
-      <p className="pixel mt-4 text-[0.6rem] text-ink-soft">DEMO · SIGN-IN SIMULATED</p>
-
-      {signingIn && (
-        <SignInModal
-          onClose={() => setSigningIn(false)}
-          onSignedIn={() => navigate("/app")}
-        />
-      )}
+      {signingIn && <SignInModal onClose={() => setSigningIn(false)} />}
     </div>
   );
 }

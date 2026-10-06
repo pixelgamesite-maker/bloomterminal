@@ -20,6 +20,7 @@ export function ProfileMenu() {
   }, []);
 
   const short = t.address ? `${t.address.slice(0, 5)}…${t.address.slice(-4)}` : null;
+  const avatar = t.avatar ?? LOGO;
 
   return (
     <div className="relative" ref={ref}>
@@ -27,7 +28,7 @@ export function ProfileMenu() {
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-2 rounded-full border-2 border-ink bg-screen py-1 pl-1 pr-2.5"
       >
-        <img src={LOGO} className="pixel h-7 w-7 rounded-full" alt="" />
+        <img src={avatar} className="pixel h-7 w-7 rounded-full object-cover" alt="" />
         <span className="font-body text-sm font-bold">@{t.handle}</span>
         <ChevronDown size={15} />
       </button>
@@ -35,7 +36,7 @@ export function ProfileMenu() {
       {open && (
         <div className="card absolute right-0 top-12 z-50 w-60 p-3 text-left">
           <div className="flex items-center gap-2 pb-2">
-            <img src={LOGO} className="pixel h-9 w-9 rounded-full" alt="" />
+            <img src={avatar} className="pixel h-9 w-9 rounded-full object-cover" alt="" />
             <div className="min-w-0">
               <div className="truncate font-bold">@{t.handle}</div>
               <div className="text-xs text-ink-soft">

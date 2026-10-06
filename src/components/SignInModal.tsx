@@ -4,23 +4,18 @@ import { Button } from "@/components/ui/button";
 import { useTerminal } from "@/state/terminal";
 import { LOGO } from "@/lib/art";
 
-/**
- * The "Register a Worker" gate. Sign-in is simulated for now; this is where
- * real X OAuth drops in (supabase.auth.signInWithOAuth({ provider: 'twitter' })).
- */
-export function SignInModal({
-  onClose,
-  onSignedIn,
-}: {
-  onClose: () => void;
-  onSignedIn: () => void;
-}) {
-  const { connectX } = useTerminal();
-  const [handle, setHandle] = useState("");
+/** Real X sign-in (Supabase OAuth). Clicking redirects to X and back to /app. */
+export function SignInModal({ onClose }: { onClose: () => void }) {
+  const { signInWithX } = useTerminal();
+  const [busy, setBusy] = useState(false);
 
-  function signIn() {
-    connectX(handle);
-    onSignedIn();
+  async function signIn() {
+    setBusy(true);
+    try {
+      await signInWithX();
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -41,26 +36,18 @@ export function SignInModal({
           Connect your X account to register your worker.
         </p>
 
-        <div className="mt-5 flex items-center rounded-lg border-2 border-ink bg-screen-2 px-3 h-11">
-          <span className="text-ink-soft">@</span>
-          <input
-            autoFocus
-            value={handle}
-            onChange={(e) => setHandle(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && signIn()}
-            placeholder="your_handle"
-            aria-label="X handle"
-            className="w-full bg-transparent px-1 font-body font-semibold outline-none placeholder:text-ink-soft/60"
-          />
-        </div>
-
-        <Button variant="blue" className="mt-4 w-full" onClick={signIn}>
-          Sign in with X
+        <Button variant="blue" className="mt-5 w-full" onClick={signIn} disabled={busy}>
+          <XLogo /> {busy ? "Connecting…" : "Sign in with X"}
         </Button>
-        <p className="pixel mt-3 text-[0.55rem] text-ink-soft">
-          NO REAL X CALL YET — DEMO
-        </p>
       </div>
     </div>
+  );
+}
+
+function XLogo() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
   );
 }

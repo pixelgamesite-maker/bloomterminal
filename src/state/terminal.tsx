@@ -18,17 +18,20 @@ import {
 } from "@/lib/types";
 import { ECONOMY } from "@/lib/config";
 import { INITIAL_MISSIONS, SAMPLE_HANDLES, WORKER_CLASSES } from "@/lib/mock";
+import { supabase, loadProfile } from "@/lib/supabase";
 
 /*
- * The terminal store. For now this is entirely client-side mock state so the
- * full product loop is demoable without a backend. Each action maps 1:1 to a
- * future API call (connect X -> OAuth, connect wallet -> signature, etc.),
- * which keeps the swap-in mechanical later.
+ * The terminal store. Auth is real X OAuth via Supabase when configured.
+ * The in-app game state (missions, agents, worker, rewards) is still local
+ * for now — each action maps 1:1 to a future API call so persistence can be
+ * layered on without changing the UI.
  */
 
 interface TerminalState {
   xConnected: boolean;
+  authLoading: boolean;
   handle: string | null;
+  avatar: string | null;
   walletConnected: boolean;
   address: string | null;
   missions: Mission[];
@@ -51,7 +54,7 @@ interface TerminalValue extends TerminalState {
   claimable: number;
   rewardState: RewardState;
   // actions
-  connectX: (handle?: string) => void;
+  signInWithX: () => Promise<void>;
   connectWallet: () => void;
   signOut: () => void;
   completeMission: (id: string) => void;
@@ -91,7 +94,9 @@ function randomAddress(): string {
 export function TerminalProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<TerminalState>({
     xConnected: false,
+    authLoading: Boolean(supabase), // wait for Supabase to resolve the session
     handle: null,
+    avatar: null,
     walletConnected: false,
     address: null,
     missions: INITIAL_MISSIONS,
@@ -102,6 +107,46 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   });
 
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Real X auth via Supabase: hydrate from the session, then keep in sync.
+  useEffect(() => {
+    if (!supabase) return;
+
+    async function hydrate(userId: string | undefined, meta?: Record<string, unknown>) {
+      if (!userId) {
+        setState((s) => ({ ...s, xConnected: false, handle: null, avatar: null, authLoading: false }));
+        return;
+      }
+      const profile = await loadProfile(userId);
+      const handle =
+        profile?.x_username ??
+        (meta?.user_name as string) ??
+        (meta?.preferred_username as string) ??
+        "operator";
+      const avatar =
+        profile?.x_profile_image ??
+        ((meta?.avatar_url as string) || (meta?.picture as string) || null);
+      setState((s) => ({
+        ...s,
+        xConnected: true,
+        authLoading: false,
+        handle,
+        avatar: avatar ? avatar.replace("_normal", "_400x400") : null,
+        walletConnected: Boolean(profile?.wallet_address && profile?.wallet_verified) || s.walletConnected,
+        address: profile?.wallet_address ?? s.address,
+      }));
+    }
+
+    supabase.auth.getSession().then(({ data }) => {
+      hydrate(data.session?.user?.id, data.session?.user?.user_metadata);
+    });
+
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      hydrate(session?.user?.id, session?.user?.user_metadata);
+    });
+
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   // Reward accrual: tick while a worker is active.
   useEffect(() => {
@@ -143,9 +188,19 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     return () => t.forEach(clearTimeout);
   }, []);
 
-  const connectX = useCallback((handle?: string) => {
-    const h = handle?.replace(/^@/, "").trim() || "operator";
-    setState((s) => ({ ...s, xConnected: true, handle: h }));
+  const signInWithX = useCallback(async () => {
+    if (supabase) {
+      // Real X OAuth. The browser redirects to X and back to /app, where
+      // detectSessionInUrl + onAuthStateChange pick the session up.
+      await supabase.auth.signInWithOAuth({
+        provider: "twitter",
+        options: { redirectTo: `${window.location.origin}/app` },
+      });
+      return;
+    }
+    // No backend configured (local preview without .env.local): sign in as a
+    // guest so the UI is still usable.
+    setState((s) => ({ ...s, xConnected: true, handle: "guest", authLoading: false }));
   }, []);
 
   const connectWallet = useCallback(() => {
@@ -153,9 +208,12 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(() => {
+    if (supabase) supabase.auth.signOut();
     setState({
       xConnected: false,
+      authLoading: false,
       handle: null,
+      avatar: null,
       walletConnected: false,
       address: null,
       missions: INITIAL_MISSIONS,
@@ -303,7 +361,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       displayBalance,
       claimable,
       rewardState,
-      connectX,
+      signInWithX,
       connectWallet,
       signOut,
       completeMission,
@@ -319,7 +377,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     };
   }, [
     state,
-    connectX,
+    signInWithX,
     connectWallet,
     signOut,
     completeMission,
