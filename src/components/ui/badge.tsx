@@ -2,22 +2,19 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const badgeVariants = cva(
-  "inline-flex items-center gap-1.5 rounded px-2 py-0.5 font-mono text-[0.65rem] font-medium uppercase tracking-wider",
-  {
-    variants: {
-      variant: {
-        default: "bg-secondary text-secondary-foreground",
-        primary: "bg-primary/15 text-primary",
-        accent: "bg-accent/15 text-accent",
-        up: "bg-up/15 text-up",
-        down: "bg-down/15 text-down",
-        muted: "bg-muted text-muted-foreground",
-      },
+const badgeVariants = cva("tag", {
+  variants: {
+    variant: {
+      default: "text-ink",
+      ink: "bg-ink text-paper border-ink",
+      claret: "text-claret",
+      up: "text-up",
+      down: "text-down",
+      muted: "text-ink-soft",
     },
-    defaultVariants: { variant: "default" },
-  }
-);
+  },
+  defaultVariants: { variant: "default" },
+});
 
 export interface BadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,

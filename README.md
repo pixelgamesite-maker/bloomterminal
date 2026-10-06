@@ -38,8 +38,8 @@ src/
     terminal/      MarketTable, Eligibility, …
   state/terminal.tsx   Single source of truth for the terminal flow
   lib/             types, mock data, config/economy params, utils
-  index.css        Tailwind v4 theme (Bloom terminal palette)
-  styles/bloom.css Terminal-specific utilities
+  index.css        Tailwind v4 theme (The Bloom Herald palette)
+  styles/newsprint.css  Newspaper furniture (masthead, rules, agate tables)
 ```
 
 ### What's next (wiring the real backend)

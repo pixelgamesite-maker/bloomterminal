@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { AlertTriangle, Pause, Play, Rocket } from "lucide-react";
 import { Panel } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,15 +11,15 @@ import { cn, fmt, duration } from "@/lib/utils";
 export default function Workforce() {
   const t = useTerminal();
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="font-mono text-xl font-semibold tracking-wide">
-          Workforce<span className="text-muted-foreground"> / workers</span>
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Configure a worker, assign it a market, and deploy it to generate Bloom.
+    <div className="space-y-6">
+      <header className="border-b border-rule-strong pb-3">
+        <p className="kicker">Industry &amp; Labour</p>
+        <h2 className="headline mt-1 text-4xl sm:text-5xl">Commission a Worker</h2>
+        <p className="subhead mt-2 text-lg">
+          Name a worker, assign its class and market, and send it to post to
+          begin earning Bloom.
         </p>
-      </div>
+      </header>
       {t.worker ? <ManageWorker /> : <CreateWorker />}
     </div>
   );
@@ -36,49 +35,42 @@ function CreateWorker() {
   const ready = name.trim() && cls && category && asset;
 
   return (
-    <div className="space-y-5">
-      {/* name */}
-      <Panel title="01 · Name your worker">
-        <div className="flex h-11 items-center rounded-md border border-border bg-background px-3 font-mono focus-within:border-primary/50">
-          <span className="text-muted-foreground">&gt;</span>
+    <div className="space-y-6">
+      <Panel title="I · The Name">
+        <div className="flex h-12 items-center border-2 border-rule-strong bg-paper-2 px-3 font-head">
+          <span className="text-ink-soft">&gt;</span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value.slice(0, 16))}
             placeholder="ORION"
-            className="ml-2 w-full bg-transparent uppercase tracking-wider outline-none placeholder:text-muted-foreground/40"
+            className="ml-2 w-full bg-transparent text-lg uppercase tracking-wide outline-none placeholder:text-ink-faint"
           />
         </div>
       </Panel>
 
-      {/* class */}
-      <Panel title="02 · Choose a class">
-        <div className="grid gap-3 sm:grid-cols-2">
+      <Panel title="II · The Class">
+        <div className="grid gap-4 sm:grid-cols-2">
           {WORKER_CLASSES.map((c) => (
             <button
               key={c.id}
               onClick={() => setCls(c.id)}
               className={cn(
-                "rounded-md border p-3 text-left transition-colors",
-                cls === c.id
-                  ? "border-primary bg-primary/[0.07]"
-                  : "border-border hover:border-primary/40"
+                "border p-4 text-left transition-colors",
+                cls === c.id ? "border-rule-strong bg-paper-2" : "border-rule hover:border-rule-strong"
               )}
             >
-              <div className="flex items-center justify-between">
-                <span className="font-mono font-semibold uppercase tracking-wider">
-                  {c.label}
-                </span>
-                <span className="font-mono text-xs text-primary tnum">×{c.modifier}</span>
+              <div className="flex items-baseline justify-between">
+                <span className="headline text-2xl">{c.label}</span>
+                <span className="font-head text-sm tnum text-ink-soft">×{c.modifier}</span>
               </div>
-              <div className="mt-0.5 text-xs italic text-muted-foreground">"{c.identity}"</div>
-              <p className="mt-2 text-sm text-muted-foreground">{c.purpose}</p>
+              <div className="mt-0.5 text-sm italic text-claret">&ldquo;{c.identity}&rdquo;</div>
+              <p className="mt-2 text-[0.95rem] text-ink-soft">{c.purpose}</p>
             </button>
           ))}
         </div>
       </Panel>
 
-      {/* market */}
-      <Panel title="03 · Select a market">
+      <Panel title="III · The Market">
         <div className="flex flex-wrap gap-2">
           {MARKET_CATEGORIES.map((cat) => (
             <button
@@ -88,10 +80,10 @@ function CreateWorker() {
                 setAsset(null);
               }}
               className={cn(
-                "rounded-md border px-3 py-1.5 font-mono text-xs uppercase tracking-wider transition-colors",
+                "border px-3 py-1.5 font-head text-sm font-semibold tracking-wide transition-colors",
                 category === cat
-                  ? "border-primary bg-primary/[0.07] text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/40"
+                  ? "border-rule-strong bg-ink text-paper"
+                  : "border-rule hover:border-rule-strong"
               )}
             >
               {cat}
@@ -100,11 +92,9 @@ function CreateWorker() {
         </div>
 
         {category && (
-          <div className="mt-4 border-t border-border pt-3">
+          <div className="mt-4 border-t border-rule pt-3">
             {assetsByCategory(category).length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No tokenized assets listed in {category} yet.
-              </p>
+              <p className="italic text-ink-soft">No tokenized issues listed in {category} yet.</p>
             ) : (
               <div className="flex flex-wrap gap-2">
                 {assetsByCategory(category).map((a) => (
@@ -112,10 +102,10 @@ function CreateWorker() {
                     key={a.symbol}
                     onClick={() => setAsset(a.symbol)}
                     className={cn(
-                      "rounded-md border px-3 py-1.5 font-mono text-sm transition-colors",
+                      "border px-3 py-1.5 font-head font-semibold tnum transition-colors",
                       asset === a.symbol
-                        ? "border-primary bg-primary/[0.07] text-primary"
-                        : "border-border hover:border-primary/40"
+                        ? "border-rule-strong bg-ink text-paper"
+                        : "border-rule hover:border-rule-strong"
                     )}
                   >
                     {a.symbol}
@@ -127,25 +117,18 @@ function CreateWorker() {
         )}
       </Panel>
 
-      {/* confirm */}
-      <Panel title="04 · Confirm" className={cn(ready ? "border-primary/30" : "")}>
-        <div className="flex items-start gap-2 rounded-md border border-accent/30 bg-accent/[0.05] p-3 text-sm">
-          <AlertTriangle size={16} className="mt-0.5 flex-none text-accent" />
-          <span className="text-muted-foreground">
-            Worker <span className="text-foreground">class</span> and{" "}
-            <span className="text-foreground">primary market</span> are permanent
-            after deployment.
-          </span>
+      <Panel title="IV · The Commission">
+        <div className="border border-claret bg-paper-2 p-3 text-[0.98rem]">
+          <span className="kicker mr-2">Caution</span>
+          A worker&rsquo;s <em>class</em> and <em>primary market</em> are struck
+          permanently once deployed.
         </div>
         <Button
-          className="mt-4 w-full"
+          className="mt-4 w-full h-12"
           disabled={!ready}
-          onClick={() =>
-            ready &&
-            t.createWorker({ name, cls: cls!, category: category!, asset: asset! })
-          }
+          onClick={() => ready && t.createWorker({ name, cls: cls!, category: category!, asset: asset! })}
         >
-          Confirm configuration
+          Confirm the commission
         </Button>
       </Panel>
     </div>
@@ -164,56 +147,41 @@ function ManageWorker() {
   }, []);
 
   return (
-    <Panel
-      title="Deployed worker"
-      action={<StatusDot tone={active ? "live" : "idle"} />}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <Panel title="Worker on the Books" action={<StatusDot tone={active ? "live" : "idle"} />}>
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <div className="font-mono text-2xl font-semibold">{w.name}</div>
-          <div className="mt-0.5 text-xs uppercase tracking-wider text-muted-foreground">
+          <div className="headline text-4xl">{w.name}</div>
+          <div className="mt-0.5 text-sm italic text-ink-soft">
             {cls?.label} · {w.category} · {w.asset}
           </div>
         </div>
-        <Badge variant={active ? "up" : w.status === "paused" ? "accent" : "muted"}>
-          {w.status}
-        </Badge>
+        <Badge variant={active ? "up" : w.status === "paused" ? "claret" : "muted"}>{w.status}</Badge>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3">
-        <Stat label="Deployed" value={w.deployedAt ? duration(Date.now() - w.deployedAt) : "—"} />
+      <div className="mt-5 grid grid-cols-2 gap-4 border-t border-rule pt-4 sm:grid-cols-3">
+        <Stat label="On post" value={w.deployedAt ? duration(Date.now() - w.deployedAt) : "—"} />
         <Stat label="Class modifier" value={`×${cls?.modifier.toFixed(2)}`} />
-        <Stat label="Bloom output" value={fmt(w.baseEarned)} accent />
+        <Stat label="Bloom output" value={fmt(w.baseEarned)} />
       </div>
 
-      <div className="mt-5 flex gap-3 border-t border-border pt-4">
-        {w.status === "ready" && (
-          <Button onClick={t.deployWorker}>
-            <Rocket size={15} /> Deploy worker
-          </Button>
-        )}
+      <div className="mt-5 flex gap-3 border-t border-rule pt-4">
+        {w.status === "ready" && <Button onClick={t.deployWorker}>Send to post</Button>}
         {active && (
           <Button variant="outline" onClick={t.pauseWorker}>
-            <Pause size={15} /> Pause
+            Recall
           </Button>
         )}
-        {w.status === "paused" && (
-          <Button onClick={t.resumeWorker}>
-            <Play size={15} /> Resume
-          </Button>
-        )}
+        {w.status === "paused" && <Button onClick={t.resumeWorker}>Return to post</Button>}
       </div>
     </Panel>
   );
 }
 
-function Stat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[0.62rem] uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
-      <div className={cn("tnum text-lg", accent && "text-primary")}>{value}</div>
+      <div className="folio">{label}</div>
+      <div className="headline text-xl tnum">{value}</div>
     </div>
   );
 }

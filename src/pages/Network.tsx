@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { Copy, UserPlus, Check } from "lucide-react";
 import { Panel } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,10 +15,10 @@ const STATUS_LABEL: Record<AgentStatus, string> = {
   eligible: "Eligible",
 };
 
-const STATUS_VARIANT: Record<AgentStatus, "muted" | "primary" | "accent" | "up"> = {
+const STATUS_VARIANT: Record<AgentStatus, "muted" | "claret" | "up"> = {
   invited: "muted",
-  connected: "primary",
-  wallet_pending: "accent",
+  connected: "muted",
+  wallet_pending: "claret",
   active: "up",
   eligible: "up",
 };
@@ -36,53 +35,51 @@ export default function Network() {
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="font-mono text-xl font-semibold tracking-wide">
-          Agent network<span className="text-muted-foreground"> / referrals</span>
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+    <div className="space-y-6">
+      <header className="border-b border-rule-strong pb-3">
+        <p className="kicker">Classifieds — Situations Wanted</p>
+        <h2 className="headline mt-1 text-4xl sm:text-5xl">The Agent Network</h2>
+        <p className="subhead mt-2 text-lg">
           Deploy {ECONOMY.requiredAgents} agents to activate your terminal. An
-          agent counts once they reach <span className="text-up">eligible</span>.
+          agent is counted only once it reaches eligible standing.
         </p>
-      </div>
+      </header>
 
-      <Panel title="Your invite link">
+      <Panel title="Your Notice of Invitation">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <code className="flex-1 truncate rounded-md border border-border bg-background px-3 py-2 font-mono text-sm text-primary">
+          <code className="flex-1 truncate border border-rule-strong bg-paper-2 px-3 py-2 font-head text-[0.95rem]">
             {link}
           </code>
           <Button variant="outline" size="sm" onClick={copy}>
-            {copied ? <Check size={14} /> : <Copy size={14} />}
-            {copied ? "Copied" : "Copy"}
+            {copied ? "Copied" : "Copy notice"}
           </Button>
         </div>
       </Panel>
 
       <Panel
-        title={`Network · ${t.activeAgents} / ${ECONOMY.requiredAgents} active`}
+        title={`Network — ${t.activeAgents} of ${ECONOMY.requiredAgents} active`}
         action={
           <Button size="sm" onClick={t.inviteAgent}>
-            <UserPlus size={14} /> Invite agent
+            Post an invitation
           </Button>
         }
       >
         {t.agents.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            No agents yet. Invite one to simulate the onboarding flow.
+          <p className="py-6 text-center italic text-ink-soft">
+            No agents on file. Post an invitation to watch the onboarding unfold.
           </p>
         ) : (
-          <ul className="divide-y divide-border">
+          <ul className="divide-y divide-dotted divide-rule">
             {t.agents.map((a) => {
               const settled = a.status === "active" || a.status === "eligible";
               return (
-                <li key={a.id} className="flex items-center gap-3 py-2.5">
+                <li key={a.id} className="flex items-center gap-3 py-3">
                   <StatusDot
                     tone={settled ? "live" : a.status === "wallet_pending" ? "warn" : "idle"}
                   />
-                  <span className="flex-1 font-mono text-sm">@{a.handle}</span>
+                  <span className="flex-1 font-head font-semibold">@{a.handle}</span>
                   {a.status === "wallet_pending" && (
-                    <span className="hidden text-xs text-accent sm:inline">
+                    <span className="hidden text-sm italic text-claret sm:inline">
                       Action required
                     </span>
                   )}

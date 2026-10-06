@@ -1,0 +1,254 @@
+/*
+  The Bloom Herald — printed furniture: masthead, rules, kickers, drop caps,
+  dispatch blocks, agate market tables, ink controls.
+*/
+
+/* ---- Masthead ---------------------------------------------------------- */
+.nameplate {
+  font-family: var(--font-name);
+  font-weight: 700;
+  line-height: 0.9;
+  letter-spacing: 0.01em;
+}
+
+.folio {
+  font-family: var(--font-head);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+}
+
+.rule-hair {
+  border: 0;
+  border-top: 1px solid var(--color-rule);
+}
+.rule-thick {
+  border: 0;
+  border-top: 2px solid var(--color-rule-strong);
+}
+/* classic double rule under a masthead */
+.rule-double {
+  height: 5px;
+  border: 0;
+  border-top: 2px solid var(--color-rule-strong);
+  border-bottom: 1px solid var(--color-rule-strong);
+}
+
+/* ---- Editorial type ---------------------------------------------------- */
+.kicker {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-claret);
+}
+
+.headline {
+  font-family: var(--font-head);
+  font-weight: 900;
+  line-height: 1.02;
+  letter-spacing: -0.01em;
+  font-optical-sizing: auto;
+}
+
+.subhead {
+  font-family: var(--font-head);
+  font-weight: 400;
+  font-style: italic;
+  color: var(--color-ink-soft);
+}
+
+/* drop cap for a lead paragraph */
+.dropcap::first-letter {
+  font-family: var(--font-head);
+  font-weight: 900;
+  float: left;
+  font-size: 3.1em;
+  line-height: 0.74;
+  padding: 0.06em 0.09em 0 0;
+  color: var(--color-claret);
+}
+
+.justify {
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+}
+
+/* ---- Dispatch (an article/section block) ------------------------------- */
+.dispatch {
+  background: transparent;
+  border: 1px solid var(--color-rule-strong);
+}
+.dispatch-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  border-bottom: 1px solid var(--color-rule-strong);
+  background: var(--color-paper-2);
+}
+.dispatch-title {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* hairline column separators, newspaper style */
+.col-rule {
+  border-left: 1px solid var(--color-rule);
+}
+
+/* ---- Agate: dense market listings -------------------------------------- */
+.agate {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.agate th {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-ink-soft);
+  text-align: right;
+  padding: 0 0 0.35rem;
+  border-bottom: 1.5px solid var(--color-rule-strong);
+}
+.agate th:first-child {
+  text-align: left;
+}
+.agate td {
+  padding: 0.3rem 0;
+  border-bottom: 1px dotted var(--color-rule);
+  text-align: right;
+}
+.agate td:first-child {
+  text-align: left;
+}
+.tnum {
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+/* ---- Controls ---------------------------------------------------------- */
+.ink-btn {
+  font-family: var(--font-head);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1.5px solid var(--color-rule-strong);
+  background: var(--color-ink);
+  color: var(--color-paper);
+  transition: background-color 0.15s, color 0.15s;
+  cursor: pointer;
+}
+.ink-btn:hover { background: var(--color-claret); border-color: var(--color-claret); }
+.ink-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.ink-btn:disabled:hover { background: var(--color-ink); border-color: var(--color-rule-strong); }
+
+.ink-btn-ghost {
+  background: transparent;
+  color: var(--color-ink);
+}
+.ink-btn-ghost:hover { background: var(--color-ink); color: var(--color-paper); }
+
+.ink-btn-claret {
+  background: var(--color-claret);
+  border-color: var(--color-claret);
+  color: var(--color-paper);
+}
+.ink-btn-claret:hover { background: var(--color-ink); border-color: var(--color-ink); }
+
+/* a hand-stamped tag */
+.tag {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.08rem 0.4rem;
+  border: 1px solid currentColor;
+}
+
+/* a wax/press seal, used for the NFT + eligibility stamps */
+.seal {
+  font-family: var(--font-head);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-claret);
+  border: 2px double var(--color-claret);
+  transform: rotate(-4deg);
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+}
+
+/* ink progress bar */
+.inkbar {
+  height: 10px;
+  border: 1px solid var(--color-rule-strong);
+  background: var(--color-paper);
+  overflow: hidden;
+}
+.inkbar > span {
+  display: block;
+  height: 100%;
+  background: var(--color-ink);
+  /* printed-rule hatch so a filled bar still reads as ink on paper */
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 3px,
+    rgba(246, 234, 218, 0.22) 3px 4px
+  );
+  transition: width 0.5s ease;
+}
+
+/* status dot, set as a small printed bullet */
+.inkdot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  display: inline-block;
+  border-radius: 999px;
+  border: 1px solid var(--color-rule-strong);
+}
+.inkdot-live { background: var(--color-up); }
+.inkdot-idle { background: var(--color-paper-3); }
+.inkdot-warn { background: var(--color-claret); }
+
+.text-up { color: var(--color-up); }
+.text-down { color: var(--color-down); }
+
+/* ticker strip */
+.ticker {
+  border-top: 1px solid var(--color-rule-strong);
+  border-bottom: 1px solid var(--color-rule-strong);
+  background: var(--color-paper-2);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.ticker-track {
+  display: inline-block;
+  padding: 0.3rem 0;
+  animation: ticker 38s linear infinite;
+}
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track { animation: none; }
+}

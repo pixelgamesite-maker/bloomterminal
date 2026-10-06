@@ -1,15 +1,15 @@
 import { Link } from "react-router-dom";
-import { Check, ExternalLink, Wallet, Users } from "lucide-react";
 import { Panel } from "@/components/ui/panel";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { useTerminal } from "@/state/terminal";
 import type { Mission, MissionType } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-const TYPE_VARIANT: Record<MissionType, "primary" | "accent" | "up" | "default"> = {
-  social: "primary",
-  onchain: "accent",
+const TYPE_VARIANT: Record<MissionType, "claret" | "ink" | "up" | "default"> = {
+  social: "claret",
+  onchain: "ink",
   network: "up",
   terminal: "default",
 };
@@ -20,28 +20,27 @@ export default function Missions() {
   const progress = (done / t.missions.length) * 100;
 
   return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="font-mono text-xl font-semibold tracking-wide">
-          Missions<span className="text-muted-foreground"> / application</span>
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Complete these to qualify your terminal. Requirements can change —
-          missions are modular.
+    <div className="space-y-6">
+      <header className="border-b border-rule-strong pb-3">
+        <p className="kicker">The Application</p>
+        <h2 className="headline mt-1 text-4xl sm:text-5xl">Terms of Admission</h2>
+        <p className="subhead mt-2 text-lg">
+          Complete each notice to qualify your terminal. Requirements are modular
+          and subject to revision without further printing.
         </p>
-      </div>
+      </header>
 
-      <Panel>
-        <div className="mb-2 flex items-center justify-between font-mono text-xs uppercase tracking-wider text-muted-foreground">
-          <span>Application progress</span>
+      <Panel title="Application Progress">
+        <div className="mb-2 flex items-baseline justify-between folio">
+          <span>Filed</span>
           <span className="tnum">
-            {done} / {t.missions.length} · {Math.round(progress)}%
+            {done} of {t.missions.length} · {Math.round(progress)}%
           </span>
         </div>
-        <Progress value={progress} tone={progress === 100 ? "up" : "primary"} />
+        <Progress value={progress} />
       </Panel>
 
-      <div className="grid gap-3">
+      <div className="divide-y divide-rule border-t border-b border-rule-strong">
         {t.missions.map((m) => (
           <MissionRow key={m.id} mission={m} />
         ))}
@@ -54,52 +53,45 @@ function MissionRow({ mission: m }: { mission: Mission }) {
   const t = useTerminal();
 
   return (
-    <Panel bodyClassName="flex items-center gap-4">
+    <div className="flex items-center gap-4 py-4">
       <span
-        className={`grid h-9 w-9 flex-none place-items-center rounded-md ${
-          m.done ? "bg-up/20 text-up" : "bg-muted text-muted-foreground"
-        }`}
+        className={cn(
+          "grid h-10 w-10 flex-none place-items-center border font-head text-lg font-semibold",
+          m.done ? "border-up text-up" : "border-rule text-ink-faint"
+        )}
       >
-        {m.done ? <Check size={16} strokeWidth={3} /> : <TypeIcon type={m.type} />}
+        {m.done ? "✓" : "§"}
       </span>
 
       <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">{m.title}</span>
+        <div className="flex items-baseline gap-2">
+          <span className="headline text-xl">{m.title}</span>
           <Badge variant={TYPE_VARIANT[m.type]}>{m.type}</Badge>
         </div>
-        <p className="truncate text-sm text-muted-foreground">{m.description}</p>
+        <p className="truncate text-[0.98rem] text-ink-soft">{m.description}</p>
       </div>
 
-      <span className="hidden font-mono text-xs text-muted-foreground tnum sm:block">
-        +{m.reward}
-      </span>
+      <span className="hidden italic text-ink-soft tnum sm:block">+{m.reward}</span>
 
       <div className="flex-none">
         {m.done ? (
-          <Badge variant="up">Done</Badge>
+          <Badge variant="up">Filed</Badge>
         ) : m.id === "bind-wallet" ? (
-          <Button size="sm" variant="accent" onClick={t.connectWallet}>
-            <Wallet size={14} /> Connect
+          <Button size="sm" variant="claret" onClick={t.connectWallet}>
+            Bind
           </Button>
         ) : m.id === "invite-agents" ? (
           <Link to="/terminal/network">
             <Button size="sm" variant="outline">
-              <Users size={14} /> Network
+              Network
             </Button>
           </Link>
         ) : (
           <Button size="sm" variant="outline" onClick={() => t.completeMission(m.id)}>
-            {m.external && <ExternalLink size={14} />} Verify
+            Verify
           </Button>
         )}
       </div>
-    </Panel>
+    </div>
   );
-}
-
-function TypeIcon({ type }: { type: MissionType }) {
-  if (type === "onchain") return <Wallet size={16} />;
-  if (type === "network") return <Users size={16} />;
-  return <ExternalLink size={16} />;
 }

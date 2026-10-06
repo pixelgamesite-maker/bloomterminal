@@ -1,4 +1,3 @@
-import { Check, X } from "lucide-react";
 import { useTerminal } from "@/state/terminal";
 import { ECONOMY } from "@/lib/config";
 import { cn } from "@/lib/utils";
@@ -12,13 +11,17 @@ interface Req {
 export function useRequirements(): Req[] {
   const t = useTerminal();
   return [
-    { label: "X account", met: t.xConnected, detail: t.handle ? `@${t.handle}` : "not connected" },
+    { label: "X account", met: t.xConnected, detail: t.handle ? `@${t.handle}` : "not filed" },
     { label: "Wallet", met: t.walletConnected, detail: t.walletConnected ? "bound" : "not bound" },
-    { label: "Missions", met: t.missionsComplete, detail: `${t.missions.filter((m) => m.done).length} / ${t.missions.length}` },
+    {
+      label: "Missions",
+      met: t.missionsComplete,
+      detail: `${t.missions.filter((m) => m.done).length} of ${t.missions.length}`,
+    },
     {
       label: "Active agents",
       met: t.activeAgents >= ECONOMY.requiredAgents,
-      detail: `${t.activeAgents} / ${ECONOMY.requiredAgents}`,
+      detail: `${t.activeAgents} of ${ECONOMY.requiredAgents}`,
     },
   ];
 }
@@ -26,23 +29,27 @@ export function useRequirements(): Req[] {
 export function EligibilityChecklist({ compact }: { compact?: boolean }) {
   const reqs = useRequirements();
   return (
-    <ul className="space-y-2">
-      {reqs.map((r) => (
-        <li key={r.label} className="flex items-center justify-between gap-3 text-sm">
-          <span className="flex items-center gap-2">
+    <ul>
+      {reqs.map((r, i) => (
+        <li
+          key={r.label}
+          className={cn(
+            "flex items-baseline justify-between gap-3 py-1.5",
+            i < reqs.length - 1 && "border-b border-dotted border-rule"
+          )}
+        >
+          <span className="flex items-baseline gap-2">
             <span
               className={cn(
-                "grid h-4 w-4 place-items-center rounded-full",
-                r.met ? "bg-up/20 text-up" : "bg-muted text-muted-foreground"
+                "font-head font-semibold",
+                r.met ? "text-up" : "text-ink-faint"
               )}
             >
-              {r.met ? <Check size={11} strokeWidth={3} /> : <X size={11} strokeWidth={3} />}
+              {r.met ? "✓" : "✗"}
             </span>
-            <span className={cn(!r.met && "text-muted-foreground")}>{r.label}</span>
+            <span className={cn(!r.met && "text-ink-soft")}>{r.label}</span>
           </span>
-          {!compact && (
-            <span className="font-mono text-xs text-muted-foreground tnum">{r.detail}</span>
-          )}
+          {!compact && <span className="text-sm italic text-ink-soft tnum">{r.detail}</span>}
         </li>
       ))}
     </ul>

@@ -7,7 +7,10 @@ interface PanelProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title">
   bodyClassName?: string;
 }
 
-/** The core terminal building block: a bordered, titled panel. */
+/**
+ * A "dispatch" — the broadsheet's boxed article/section, with a ruled
+ * header strip. Kept named Panel so callers don't churn.
+ */
 export function Panel({
   title,
   action,
@@ -17,14 +20,14 @@ export function Panel({
   ...props
 }: PanelProps) {
   return (
-    <div className={cn("panel", className)} {...props}>
+    <div className={cn("dispatch", className)} {...props}>
       {(title || action) && (
-        <div className="panel-header">
-          <span className="panel-title">{title}</span>
+        <div className="dispatch-head">
+          <span className="dispatch-title">{title}</span>
           {action}
         </div>
       )}
-      <div className={cn("p-3.5", bodyClassName)}>{children}</div>
+      <div className={cn("p-4", bodyClassName)}>{children}</div>
     </div>
   );
 }
