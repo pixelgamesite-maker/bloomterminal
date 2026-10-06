@@ -1,0 +1,113 @@
+/*
+  Terminal-specific presentation utilities. Kept small and deliberate —
+  the spec calls for minimal animation and sparing CRT touches.
+*/
+
+/* Faint grid backdrop for the app shell. */
+.bloom-grid-bg {
+  background-color: hsl(var(--background));
+  background-image:
+    linear-gradient(to right, hsl(var(--grid) / 0.6) 1px, transparent 1px),
+    linear-gradient(to bottom, hsl(var(--grid) / 0.6) 1px, transparent 1px);
+  background-size: 44px 44px;
+  background-position: center top;
+}
+
+/* A panel: the core building block of the terminal. */
+.panel {
+  position: relative;
+  background: hsl(var(--panel));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-lg);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.6rem 0.85rem;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.panel-title {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Monospace tabular numerals for prices and balances. */
+.tnum {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Status dot. */
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  display: inline-block;
+  flex: none;
+}
+.dot-live {
+  background: hsl(var(--up));
+  box-shadow: 0 0 0 3px hsl(var(--up) / 0.15);
+  animation: dot-pulse 2.4s ease-in-out infinite;
+}
+.dot-idle {
+  background: hsl(var(--muted-foreground));
+}
+.dot-warn {
+  background: hsl(var(--accent));
+  box-shadow: 0 0 0 3px hsl(var(--accent) / 0.15);
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Blinking cursor for terminal headings. */
+.cursor::after {
+  content: "";
+  display: inline-block;
+  width: 0.5ch;
+  height: 1em;
+  margin-left: 2px;
+  background: hsl(var(--primary));
+  transform: translateY(2px);
+  animation: blink 1.1s step-end infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* Very subtle scanline veil — used only on the landing hero. */
+.scanlines::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 2px,
+    hsl(0 0% 0% / 0.18) 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.4;
+}
+
+.text-up { color: hsl(var(--up)); }
+.text-down { color: hsl(var(--down)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-live,
+  .cursor::after {
+    animation: none;
+  }
+}

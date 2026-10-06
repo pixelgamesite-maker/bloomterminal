@@ -6,9 +6,47 @@
 
 An onchain market intelligence and agent platform for the tokenized-equity ecosystem.
 
-`Status: Concept / Pre-MVP` · `Docs: Product + Technical Spec`
+`Status: MVP scaffold (mock state)` · `Stack: Vite · React 19 · TS · Tailwind v4`
 
 </div>
+
+---
+
+## Quickstart
+
+```bash
+npm install
+npm run dev        # http://localhost:8080
+npm run build      # production build to dist/
+npm run typecheck  # tsc --noEmit
+```
+
+The app currently runs on **local mock state** — the full product loop
+(connect → missions → agents → eligibility → workforce → rewards → mint →
+claim) is demoable with no backend. Auth, wallet and chain calls are wired as
+clearly-flagged placeholders; see `src/lib/config.ts` and `.env.example` for
+what to fill in as each integration lands.
+
+### Project layout
+
+```
+src/
+  pages/           Landing, TerminalLayout, Dashboard, Missions,
+                   Network, Workforce, Rewards
+  components/
+    ui/            Button, Panel, Badge, Progress primitives
+    terminal/      MarketTable, Eligibility, …
+  state/terminal.tsx   Single source of truth for the terminal flow
+  lib/             types, mock data, config/economy params, utils
+  index.css        Tailwind v4 theme (Bloom terminal palette)
+  styles/bloom.css Terminal-specific utilities
+```
+
+### What's next (wiring the real backend)
+
+- **Supabase** for X OAuth + the data model in [Data Model](#data-model).
+- **wagmi + RainbowKit** for wallet connect/binding (needs a WalletConnect id).
+- A **reward engine** and **tokenized-asset price feed** — see [Open Questions](#open-questions).
 
 ---
 
