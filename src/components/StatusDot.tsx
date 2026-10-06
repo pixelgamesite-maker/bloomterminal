@@ -10,10 +10,10 @@ export function StatusDot({
   return (
     <span
       className={cn(
-        "inkdot",
-        tone === "live" && "inkdot-live",
-        tone === "idle" && "inkdot-idle",
-        tone === "warn" && "inkdot-warn",
+        "dot",
+        tone === "live" && "dot-live",
+        tone === "idle" && "dot-idle",
+        tone === "warn" && "dot-warn",
         className
       )}
     />

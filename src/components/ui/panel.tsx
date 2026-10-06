@@ -1,29 +1,28 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
-interface PanelProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
+interface CardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
   title?: React.ReactNode;
   action?: React.ReactNode;
   bodyClassName?: string;
+  soft?: boolean;
 }
 
-/**
- * A "dispatch" — the broadsheet's boxed article/section, with a ruled
- * header strip. Kept named Panel so callers don't churn.
- */
+/** A soft screen card. Title row is optional and understated. */
 export function Panel({
   title,
   action,
   children,
   className,
   bodyClassName,
+  soft,
   ...props
-}: PanelProps) {
+}: CardProps) {
   return (
-    <div className={cn("dispatch", className)} {...props}>
+    <div className={cn(soft ? "card-soft" : "card", className)} {...props}>
       {(title || action) && (
-        <div className="dispatch-head">
-          <span className="dispatch-title">{title}</span>
+        <div className="flex items-center justify-between gap-2 px-4 pt-3">
+          <span className="display text-sm">{title}</span>
           {action}
         </div>
       )}

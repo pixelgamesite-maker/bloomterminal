@@ -1,37 +1,41 @@
 @import "tailwindcss";
 
 /*
-  The Bloom Herald — a vintage onchain financial broadsheet.
-  Aged salmon ledger paper, warm ink, oxblood second colour, ledger
-  green / claret for market up & down. Light, printed, deliberately sharp.
+  Bloom Terminal — cozy retro-CRT. The whole site reads like it's on an old
+  TV screen: soft cream glow, faint scanlines, a dark vignette at the edges.
+  Playful pastel accents pulled from the pixel-TV art.
 */
 @theme inline {
-  --color-paper: #f6eada;
-  --color-paper-2: #efe0cb;
-  --color-paper-3: #e9d7bd;
-  --color-ink: #211c16;
-  --color-ink-soft: #6a5f50;
-  --color-ink-faint: #8a7d6b;
-  --color-rule: #cbb79c;
-  --color-rule-strong: #211c16;
-  --color-claret: #8a2b22;
-  --color-up: #2c6e49;
-  --color-down: #b4382b;
-  --color-seal: #96702f;
+  --color-screen: #ece5d6;     /* the lit screen — page background */
+  --color-screen-2: #e3dbc8;  /* slightly darker inset */
+  --color-room: #16131c;       /* the dark tube around the screen */
+  --color-ink: #2e2a3a;        /* soft near-black text */
+  --color-ink-soft: #827c8e;   /* muted */
 
-  --color-background: var(--color-paper);
+  --color-pink: #ec7ba6;
+  --color-blue: #6e86e6;
+  --color-yellow: #f2bd45;
+  --color-green: #37a86b;
+  --color-red: #e3574a;
+  --color-line: #d2c9b5;
+
+  --color-background: var(--color-screen);
   --color-foreground: var(--color-ink);
-  --color-border: var(--color-rule);
 
-  --font-name: "UnifrakturCook", serif;
-  --font-head: "Fraunces", Georgia, "Times New Roman", serif;
-  --font-body: "Spectral", Georgia, "Times New Roman", serif;
+  --font-pixel: "Press Start 2P", ui-monospace, monospace;
+  --font-display: "Pixelify Sans", "Press Start 2P", sans-serif;
+  --font-body: "Nunito", ui-sans-serif, system-ui, sans-serif;
 
-  --radius: 0px;
+  --radius: 14px;
+}
+
+:root {
+  --line: #d2c9b5;
+  --shadow-hard: 3px 3px 0 0 var(--color-ink);
 }
 
 * {
-  border-color: var(--color-rule);
+  border-color: var(--line);
 }
 
 html {
@@ -40,34 +44,33 @@ html {
 
 body {
   margin: 0;
-  background: var(--color-paper);
+  background: var(--color-room);
   color: var(--color-ink);
   font-family: var(--font-body);
-  font-size: 17px;
-  line-height: 1.6;
+  font-size: 16px;
+  line-height: 1.55;
+  font-weight: 600;
   -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-  /* faint laid-paper fibre so the salmon reads as stock, not a flat fill */
-  background-image:
-    repeating-linear-gradient(
-      90deg,
-      transparent 0 2px,
-      rgba(33, 28, 22, 0.012) 2px 3px
-    );
 }
 
 ::selection {
-  background: rgba(138, 43, 34, 0.18);
+  background: color-mix(in srgb, var(--color-pink) 40%, transparent);
+}
+
+/* image rendering crisp for the pixel art */
+img.pixel {
+  image-rendering: pixelated;
 }
 
 ::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--color-paper-2);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-rule);
-  border: 3px solid var(--color-paper-2);
+  background: var(--color-ink-soft);
+  border-radius: 999px;
+  border: 2px solid var(--color-screen);
 }

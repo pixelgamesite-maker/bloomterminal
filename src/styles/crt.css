@@ -1,0 +1,214 @@
+/*
+  CRT furniture: the screen frame, scanlines, vignette, pixel controls
+  and soft cards. Kept subtle — the dark edges should feel present, not loud.
+*/
+
+/* ---- The TV ------------------------------------------------------------ */
+.crt-room {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(130% 120% at 50% 0%, #241f2e 0%, var(--color-room) 60%);
+  padding: clamp(8px, 2.2vw, 26px);
+}
+
+.crt-screen {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  border-radius: clamp(14px, 2.4vw, 26px);
+  background: var(--color-screen);
+  overflow: hidden;
+  /* the glass bulge + dark vignette into the corners */
+  box-shadow:
+    0 0 0 2px #0c0a11,
+    0 0 0 7px #2a2533,
+    0 0 0 8px #0c0a11,
+    0 18px 50px -12px rgba(0, 0, 0, 0.7);
+}
+
+/* content scrolls inside the glass */
+.crt-scroll {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* scanlines + vignette ride on top, fixed to the glass, never scrolling */
+.crt-veil {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  border-radius: inherit;
+  /* vignette */
+  box-shadow:
+    inset 0 0 70px 10px rgba(22, 19, 28, 0.28),
+    inset 0 0 160px 40px rgba(22, 19, 28, 0.18);
+}
+.crt-veil::before {
+  /* scanlines */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(22, 19, 28, 0.05) 0px,
+    rgba(22, 19, 28, 0.05) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: multiply;
+  opacity: 0.6;
+}
+.crt-veil::after {
+  /* soft top glass glare */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    transparent 22%
+  );
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .crt-screen {
+    animation: crt-flicker 6s steps(60) infinite;
+  }
+  @keyframes crt-flicker {
+    0%, 97%, 100% { filter: none; }
+    98% { filter: brightness(1.03); }
+    99% { filter: brightness(0.98); }
+  }
+}
+
+/* ---- Type helpers ------------------------------------------------------ */
+.pixel { font-family: var(--font-pixel); }
+.display { font-family: var(--font-display); font-weight: 700; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* ---- Pixel buttons ----------------------------------------------------- */
+.btn {
+  font-family: var(--font-display);
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 2px solid var(--color-ink);
+  border-radius: 10px;
+  background: var(--color-screen);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-hard);
+  transition: transform 0.06s ease, box-shadow 0.06s ease, background-color 0.12s;
+  cursor: pointer;
+  user-select: none;
+}
+.btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 0 var(--color-ink); }
+.btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 0 var(--color-ink); }
+.btn:disabled { opacity: 0.45; box-shadow: var(--shadow-hard); transform: none; cursor: not-allowed; }
+.btn-pink   { background: var(--color-pink);   color: #fff; }
+.btn-blue   { background: var(--color-blue);   color: #fff; }
+.btn-yellow { background: var(--color-yellow); color: var(--color-ink); }
+.btn-green  { background: var(--color-green);  color: #fff; }
+
+/* ---- Cards ------------------------------------------------------------- */
+.card {
+  background: var(--color-screen);
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-hard);
+}
+.card-soft {
+  background: color-mix(in srgb, var(--color-screen-2) 70%, var(--color-screen));
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+}
+
+/* a little TV/photo frame for the pixel art */
+.tv-frame {
+  border: 3px solid var(--color-ink);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--shadow-hard);
+  background: #d7d2c7;
+  line-height: 0;
+}
+.tv-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* ---- Chips / pills ----------------------------------------------------- */
+.chip {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.72rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  border: 2px solid var(--color-ink);
+  background: var(--color-screen);
+  line-height: 1.4;
+}
+.chip-pink   { background: color-mix(in srgb, var(--color-pink) 22%, var(--color-screen)); }
+.chip-blue   { background: color-mix(in srgb, var(--color-blue) 22%, var(--color-screen)); }
+.chip-green  { background: color-mix(in srgb, var(--color-green) 24%, var(--color-screen)); }
+.chip-yellow { background: color-mix(in srgb, var(--color-yellow) 30%, var(--color-screen)); }
+
+/* ---- Progress ---------------------------------------------------------- */
+.meter {
+  height: 14px;
+  border: 2px solid var(--color-ink);
+  border-radius: 999px;
+  background: var(--color-screen);
+  overflow: hidden;
+  padding: 2px;
+}
+.meter > span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--color-green);
+  transition: width 0.5s ease;
+}
+
+/* ---- Status dot -------------------------------------------------------- */
+.dot {
+  width: 10px; height: 10px; flex: none;
+  border-radius: 999px;
+  border: 2px solid var(--color-ink);
+  display: inline-block;
+}
+.dot-live { background: var(--color-green); }
+.dot-idle { background: var(--color-ink-soft); }
+.dot-warn { background: var(--color-yellow); }
+
+.text-up { color: var(--color-green); }
+.text-down { color: var(--color-red); }
+
+/* ---- Tiny segmented tabs ---------------------------------------------- */
+.tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 2px solid var(--color-ink);
+  border-radius: 12px;
+  background: var(--color-screen-2);
+}
+.tab {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 8px;
+  color: var(--color-ink-soft);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab[data-active="true"] {
+  background: var(--color-ink);
+  color: var(--color-screen);
+}

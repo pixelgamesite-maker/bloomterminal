@@ -2,27 +2,24 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-head font-semibold tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink focus-visible:ring-offset-2 focus-visible:ring-offset-paper disabled:pointer-events-none disabled:opacity-40 select-none",
-  {
-    variants: {
-      variant: {
-        primary: "ink-btn",
-        claret: "ink-btn ink-btn-claret",
-        outline: "ink-btn ink-btn-ghost",
-        ghost:
-          "border border-transparent text-ink-soft hover:text-ink hover:border-rule bg-transparent",
-      },
-      size: {
-        sm: "h-8 px-3 text-xs",
-        md: "h-10 px-4 text-sm",
-        lg: "h-12 px-6 text-base",
-        icon: "h-9 w-9",
-      },
+const buttonVariants = cva("btn focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ink", {
+  variants: {
+    variant: {
+      default: "",
+      pink: "btn-pink",
+      blue: "btn-blue",
+      yellow: "btn-yellow",
+      green: "btn-green",
     },
-    defaultVariants: { variant: "primary", size: "md" },
-  }
-);
+    size: {
+      sm: "h-9 px-3 text-xs",
+      md: "h-11 px-4 text-sm",
+      lg: "h-14 px-7 text-base",
+      icon: "h-10 w-10",
+    },
+  },
+  defaultVariants: { variant: "default", size: "md" },
+});
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,

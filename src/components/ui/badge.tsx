@@ -2,15 +2,17 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
-const badgeVariants = cva("tag", {
+const badgeVariants = cva("chip", {
   variants: {
     variant: {
-      default: "text-ink",
-      ink: "bg-ink text-paper border-ink",
-      claret: "text-claret",
-      up: "text-up",
-      down: "text-down",
+      default: "",
+      pink: "chip-pink",
+      blue: "chip-blue",
+      green: "chip-green",
+      yellow: "chip-yellow",
       muted: "text-ink-soft",
+      up: "chip-green",
+      down: "chip-pink",
     },
   },
   defaultVariants: { variant: "default" },

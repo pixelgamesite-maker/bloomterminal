@@ -1,14 +1,9 @@
 import { cn } from "@/lib/utils";
 
-interface ProgressProps {
-  value: number; // 0..100
-  className?: string;
-}
-
-export function Progress({ value, className }: ProgressProps) {
+export function Progress({ value, className }: { value: number; className?: string }) {
   return (
     <div
-      className={cn("inkbar", className)}
+      className={cn("meter", className)}
       role="progressbar"
       aria-valuenow={Math.round(value)}
       aria-valuemin={0}

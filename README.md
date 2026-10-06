@@ -31,15 +31,19 @@ what to fill in as each integration lands.
 
 ```
 src/
-  pages/           Landing, TerminalLayout, Dashboard, Missions,
-                   Network, Workforce, Rewards
+  pages/           Landing (hero + Register a Worker), Console (signed-in app)
   components/
+    CrtFrame       the TV screen (vignette + scanlines) wrapping everything
+    ProfileMenu    inline avatar menu (bind wallet, sign out)
+    SignInModal    X sign-in gate
+    TvArt          pixel-TV character frame
     ui/            Button, Panel, Badge, Progress primitives
-    terminal/      MarketTable, Eligibility, …
-  state/terminal.tsx   Single source of truth for the terminal flow
-  lib/             types, mock data, config/economy params, utils
-  index.css        Tailwind v4 theme (The Bloom Herald palette)
-  styles/newsprint.css  Newspaper furniture (masthead, rules, agate tables)
+  state/terminal.tsx   Single source of truth for the flow
+  lib/             types, mock data, art map, config/economy params, utils
+  index.css        Tailwind v4 theme (retro-CRT pastel palette)
+  styles/crt.css   CRT frame + pixel controls
+public/            pixel-TV art (1–4.jpeg, logo.jpg, terminal.png)
+supabase/schema.sql  database migration
 ```
 
 ### What's next (wiring the real backend)
