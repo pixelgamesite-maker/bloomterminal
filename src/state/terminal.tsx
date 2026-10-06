@@ -190,10 +190,11 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
 
   const signInWithX = useCallback(async () => {
     if (supabase) {
-      // Real X OAuth. The browser redirects to X and back to /app, where
+      // Real X OAuth (OAuth 2.0 — provider "x"; legacy "twitter"/OAuth 1.0a is
+      // being deprecated). Browser redirects to X and back to /app, where
       // detectSessionInUrl + onAuthStateChange pick the session up.
       await supabase.auth.signInWithOAuth({
-        provider: "twitter",
+        provider: "x",
         options: { redirectTo: `${window.location.origin}/app` },
       });
       return;
