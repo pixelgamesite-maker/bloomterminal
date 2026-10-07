@@ -209,6 +209,73 @@
   .float, .boot { animation: none; }
 }
 
+/* ---- Interactive hero monitors ---------------------------------------- */
+.mon {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  --glow: rgba(255, 255, 255, 0.55);
+  transition: transform 0.16s ease;
+}
+.mon img {
+  width: 100%;
+  height: auto;
+  display: block;
+  image-rendering: pixelated;
+  animation: monGlow 3.4s ease-in-out infinite;
+}
+.mon:hover { transform: translateY(-7px) scale(1.02); z-index: 20 !important; }
+.mon:focus-visible { outline: 3px solid var(--color-ink); outline-offset: 3px; border-radius: 10px; }
+
+@keyframes monGlow {
+  0%, 100% { filter: drop-shadow(0 0 5px var(--glow)) drop-shadow(2px 4px 0 rgba(0,0,0,0.18)); }
+  50% { filter: drop-shadow(0 0 15px var(--glow)) drop-shadow(2px 4px 0 rgba(0,0,0,0.18)); }
+}
+
+/* a soft label that floats under a monitor on hover */
+.mon-tip {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  transform: translate(-50%, 100%);
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  border: 2px solid var(--color-ink);
+  border-radius: 8px;
+  background: var(--color-ink);
+  color: var(--color-screen);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.14s ease;
+}
+.mon:hover .mon-tip { opacity: 1; }
+
+/* ---- Animated background chart ---------------------------------------- */
+.bg-chart {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0.5;
+  z-index: 0;
+}
+.bg-chart svg { position: absolute; top: 0; height: 100%; }
+.bg-chart .scroll { animation: chartScroll 40s linear infinite; }
+@keyframes chartScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mon img { animation: none; filter: drop-shadow(2px 4px 0 rgba(0,0,0,0.18)); }
+  .bg-chart .scroll { animation: none; }
+}
+
 /* ---- Tiny segmented tabs ---------------------------------------------- */
 .tabs {
   display: inline-flex;

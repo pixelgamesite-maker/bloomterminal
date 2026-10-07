@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import Landing from "@/pages/Landing";
 import Console from "@/pages/Console";
+import Watcher from "@/pages/Watcher";
 import { LOGO } from "@/lib/art";
 
 function Gate({ children }: { children: ReactNode }) {
@@ -27,6 +28,8 @@ export default function App() {
         <CrtFrame>
           <Routes>
             <Route path="/" element={<Landing />} />
+            {/* Public — no X auth needed */}
+            <Route path="/watcher" element={<Watcher />} />
             <Route
               path="/app"
               element={
