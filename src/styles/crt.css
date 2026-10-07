@@ -189,6 +189,26 @@
 .text-up { color: var(--color-green); }
 .text-down { color: var(--color-red); }
 
+/* ---- Landing motion ---------------------------------------------------- */
+/* a gentle hover, like the TVs are floating on the screen */
+.float { animation: float 5s ease-in-out infinite; }
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+/* one-time power-on when the screen "turns on" */
+.boot { animation: boot 0.65s cubic-bezier(0.2, 0.9, 0.2, 1) both; }
+@keyframes boot {
+  0% { opacity: 0; transform: scaleY(0.6); filter: brightness(2.2) blur(1px); }
+  60% { opacity: 1; filter: brightness(1.1); }
+  100% { opacity: 1; transform: scaleY(1); filter: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .float, .boot { animation: none; }
+}
+
 /* ---- Tiny segmented tabs ---------------------------------------------- */
 .tabs {
   display: inline-flex;

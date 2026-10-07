@@ -13,7 +13,7 @@ export default function Landing() {
   if (!authLoading && xConnected) return <Navigate to="/app" replace />;
 
   return (
-    <div className="mx-auto flex min-h-full max-w-3xl flex-col items-center px-5 py-8 text-center">
+    <div className="boot mx-auto flex min-h-full max-w-3xl flex-col items-center px-5 py-8 text-center">
       {/* brand */}
       <div className="flex items-center gap-2.5">
         <img src={LOGO} className="pixel h-8 w-8 rounded-md" alt="" />
@@ -24,7 +24,7 @@ export default function Landing() {
       <img
         src={HERO}
         alt="A stack of little pixel televisions"
-        className="pixel mt-8 w-full max-w-md drop-shadow-[4px_6px_0_rgba(46,42,58,0.18)]"
+        className="float pixel mt-8 w-full max-w-md drop-shadow-[4px_6px_0_rgba(46,42,58,0.18)]"
       />
 
       <h1 className="display mt-7 text-4xl leading-tight sm:text-5xl">

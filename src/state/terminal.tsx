@@ -11,6 +11,7 @@ import {
 import {
   type Agent,
   type AgentStatus,
+  type MarketKind,
   type Mission,
   type RewardState,
   type Worker,
@@ -55,15 +56,15 @@ interface TerminalValue extends TerminalState {
   rewardState: RewardState;
   // actions
   signInWithX: () => Promise<void>;
-  connectWallet: () => void;
+  /** Bind a wallet. Returns false if the address is not a valid EVM address. */
+  bindWallet: (address: string) => boolean;
   signOut: () => void;
   completeMission: (id: string) => void;
   inviteAgent: () => void;
   advanceAgent: (id: string) => void;
   createWorker: (cfg: {
-    name: string;
     cls: WorkerClass;
-    category: string;
+    kind: MarketKind;
     asset: string;
   }) => void;
   deployWorker: () => void;
@@ -83,13 +84,6 @@ const AGENT_FLOW: AgentStatus[] = [
   "active",
   "eligible",
 ];
-
-function randomAddress(): string {
-  const hex = "0123456789abcdef";
-  let a = "0x";
-  for (let i = 0; i < 40; i++) a += hex[Math.floor(Math.random() * 16)];
-  return a;
-}
 
 export function TerminalProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<TerminalState>({
@@ -204,8 +198,24 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, xConnected: true, handle: "guest", authLoading: false }));
   }, []);
 
-  const connectWallet = useCallback(() => {
-    setState((s) => ({ ...s, walletConnected: true, address: randomAddress() }));
+  const bindWallet = useCallback((address: string) => {
+    const addr = address.trim();
+    if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) return false;
+    setState((s) => ({ ...s, walletConnected: true, address: addr }));
+    // Persist to the profile when Supabase is configured (best-effort).
+    if (supabase) {
+      supabase.auth.getUser().then(({ data }) => {
+        const uid = data.user?.id;
+        if (uid) {
+          supabase!
+            .from("profiles")
+            .update({ wallet_address: addr, wallet_verified: true })
+            .eq("id", uid)
+            .then(() => {});
+        }
+      });
+    }
+    return true;
   }, []);
 
   const signOut = useCallback(() => {
@@ -273,18 +283,20 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const createWorker = useCallback(
-    (cfg: { name: string; cls: WorkerClass; category: string; asset: string }) => {
+    (cfg: { cls: WorkerClass; kind: MarketKind; asset: string }) => {
+      const info = WORKER_CLASSES.find((c) => c.id === cfg.cls);
+      // Picking an agent is one-time and starts it working immediately.
       setState((s) => ({
         ...s,
         worker: {
           id: crypto.randomUUID(),
-          name: cfg.name.toUpperCase(),
+          name: (info?.label ?? "Agent").toUpperCase(),
           class: cfg.cls,
-          category: cfg.category,
+          kind: cfg.kind,
           asset: cfg.asset,
-          status: "ready",
+          status: "active",
           createdAt: Date.now(),
-          deployedAt: null,
+          deployedAt: Date.now(),
           baseEarned: 0,
         },
       }));
@@ -363,7 +375,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       claimable,
       rewardState,
       signInWithX,
-      connectWallet,
+      bindWallet,
       signOut,
       completeMission,
       inviteAgent,
@@ -379,7 +391,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, [
     state,
     signInWithX,
-    connectWallet,
+    bindWallet,
     signOut,
     completeMission,
     inviteAgent,

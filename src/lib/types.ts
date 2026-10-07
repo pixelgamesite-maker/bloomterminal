@@ -15,6 +15,8 @@ export interface Mission {
   done: boolean;
   /** An external action (opens X, etc.) vs. an in-app action. */
   external?: boolean;
+  /** URL opened when verifying an external task. */
+  link?: string;
 }
 
 export type AgentStatus =
@@ -43,7 +45,7 @@ export interface Worker {
   id: string;
   name: string;
   class: WorkerClass;
-  category: string;
+  kind: MarketKind;
   asset: string;
   status: WorkerStatus;
   createdAt: number;
@@ -52,10 +54,12 @@ export interface Worker {
   baseEarned: number;
 }
 
+export type MarketKind = "STOCKS" | "CRYPTO";
+
 export interface MarketAsset {
   symbol: string;
   name: string;
-  category: string;
+  kind: MarketKind;
   price: number;
   change: number; // percent
 }
@@ -72,6 +76,8 @@ export interface ClassInfo {
   label: string;
   identity: string;
   purpose: string;
+  /** One-line product-facing specification. */
+  spec: string;
   focus: string[];
   /** Output modifier applied on top of base production. */
   modifier: number;
