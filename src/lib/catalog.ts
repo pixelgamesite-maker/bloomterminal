@@ -1,7 +1,8 @@
 import type { Mission, MarketAsset, ClassInfo, MarketKind } from "./types";
 
-// The four agents. Enum ids stay (scout/analyst/momentum/sentinel) so the
-// database schema is unchanged; only the labels + specs are product-facing.
+// Static catalog: agent classes, selectable markets/assets, launch tasks, links.
+// (No fabricated prices or balances — those come from real data when wired.)
+
 export const WORKER_CLASSES: ClassInfo[] = [
   {
     id: "scout",
@@ -46,35 +47,28 @@ export const MARKET_KINDS: { id: MarketKind; label: string }[] = [
   { id: "CRYPTO", label: "Crypto" },
 ];
 
-// Tokenized stocks. (Prices are illustrative demo values.)
 export const STOCKS: MarketAsset[] = [
-  { symbol: "NVDA", name: "NVIDIA", kind: "STOCKS", price: 184.22, change: 4.21 },
-  { symbol: "TSLA", name: "Tesla", kind: "STOCKS", price: 427.18, change: -1.83 },
-  { symbol: "AAPL", name: "Apple", kind: "STOCKS", price: 242.91, change: 0.92 },
-  { symbol: "MSFT", name: "Microsoft", kind: "STOCKS", price: 512.07, change: 3.72 },
+  { symbol: "NVDA", name: "NVIDIA", kind: "STOCKS" },
+  { symbol: "TSLA", name: "Tesla", kind: "STOCKS" },
+  { symbol: "AAPL", name: "Apple", kind: "STOCKS" },
+  { symbol: "MSFT", name: "Microsoft", kind: "STOCKS" },
 ];
 
-// Ten coins to pick from.
 export const CRYPTO: MarketAsset[] = [
-  { symbol: "BTC", name: "Bitcoin", kind: "CRYPTO", price: 67420.0, change: 2.14 },
-  { symbol: "ETH", name: "Ethereum", kind: "CRYPTO", price: 3280.5, change: 3.01 },
-  { symbol: "SOL", name: "Solana", kind: "CRYPTO", price: 182.3, change: 6.22 },
-  { symbol: "BNB", name: "BNB", kind: "CRYPTO", price: 604.1, change: 1.08 },
-  { symbol: "XRP", name: "XRP", kind: "CRYPTO", price: 0.62, change: -0.74 },
-  { symbol: "DOGE", name: "Dogecoin", kind: "CRYPTO", price: 0.142, change: 4.9 },
-  { symbol: "ADA", name: "Cardano", kind: "CRYPTO", price: 0.45, change: -1.12 },
-  { symbol: "AVAX", name: "Avalanche", kind: "CRYPTO", price: 36.8, change: 2.67 },
-  { symbol: "LINK", name: "Chainlink", kind: "CRYPTO", price: 18.4, change: 5.33 },
-  { symbol: "TON", name: "Toncoin", kind: "CRYPTO", price: 7.12, change: 0.41 },
+  { symbol: "BTC", name: "Bitcoin", kind: "CRYPTO" },
+  { symbol: "ETH", name: "Ethereum", kind: "CRYPTO" },
+  { symbol: "SOL", name: "Solana", kind: "CRYPTO" },
+  { symbol: "BNB", name: "BNB", kind: "CRYPTO" },
+  { symbol: "XRP", name: "XRP", kind: "CRYPTO" },
+  { symbol: "DOGE", name: "Dogecoin", kind: "CRYPTO" },
+  { symbol: "ADA", name: "Cardano", kind: "CRYPTO" },
+  { symbol: "AVAX", name: "Avalanche", kind: "CRYPTO" },
+  { symbol: "LINK", name: "Chainlink", kind: "CRYPTO" },
+  { symbol: "TON", name: "Toncoin", kind: "CRYPTO" },
 ];
-
-export const MARKETS: MarketAsset[] = [...STOCKS, ...CRYPTO];
 
 export const assetsForKind = (kind: MarketKind) =>
   kind === "STOCKS" ? STOCKS : CRYPTO;
-
-export const findAsset = (symbol: string) =>
-  MARKETS.find((m) => m.symbol === symbol);
 
 // The X account the social tasks point at.
 export const X_HANDLE = "BloomTerminall";
@@ -129,15 +123,4 @@ export const INITIAL_MISSIONS: Mission[] = [
     reward: 150,
     done: false,
   },
-];
-
-export const SAMPLE_HANDLES = [
-  "alice",
-  "mike",
-  "satoshi",
-  "vega",
-  "nova",
-  "orion",
-  "kai",
-  "lux",
 ];

@@ -75,9 +75,9 @@ export default function Landing() {
             <EcoCard
               art="/robinhood-watcher.png"
               title="Robinhood Watcher"
-              status="live"
+              status="soon"
               blurb="Track tokenized stocks — prices, charts, movers."
-              cta="Open"
+              cta="Preview"
               onClick={() => navigate("/watcher")}
             />
             <EcoCard

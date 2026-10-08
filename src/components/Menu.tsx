@@ -4,7 +4,7 @@ import { Menu as MenuIcon, X, Eye, Users, Ship, Twitter, Home } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LOGO } from "@/lib/art";
-import { X_URL } from "@/lib/mock";
+import { X_URL } from "@/lib/catalog";
 
 interface Item {
   label: string;

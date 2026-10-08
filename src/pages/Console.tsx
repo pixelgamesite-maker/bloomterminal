@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Copy, Check, UserPlus, Lock, ExternalLink, Pause, Play, RotateCw } from "lucide-react";
+import { Copy, Check, Lock, ExternalLink, Pause, Play, RotateCw } from "lucide-react";
 import { useTerminal } from "@/state/terminal";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { TvArt } from "@/components/TvArt";
@@ -9,16 +9,11 @@ import { Panel } from "@/components/ui/panel";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { StatusDot } from "@/components/StatusDot";
-import {
-  WORKER_CLASSES,
-  MARKET_KINDS,
-  assetsForKind,
-  findAsset,
-} from "@/lib/mock";
+import { WORKER_CLASSES, MARKET_KINDS, assetsForKind } from "@/lib/catalog";
 import { CLASS_ART, LOGO } from "@/lib/art";
-import { ECONOMY, BRAND, isBackendConfigured } from "@/lib/config";
-import type { AgentStatus, MarketKind, WorkerClass } from "@/lib/types";
-import { cn, fmt, pct, duration } from "@/lib/utils";
+import { ECONOMY, BRAND } from "@/lib/config";
+import type { MarketKind, WorkerClass } from "@/lib/types";
+import { cn, duration } from "@/lib/utils";
 
 type Tab = "agent" | "tasks" | "invites" | "rewards";
 
@@ -194,7 +189,6 @@ function WorkerCard() {
   const t = useTerminal();
   const w = t.worker!;
   const cls = WORKER_CLASSES.find((c) => c.id === w.class)!;
-  const market = findAsset(w.asset);
   const active = w.status === "active";
   const [, force] = useState(0);
   useEffect(() => {
@@ -211,18 +205,19 @@ function WorkerCard() {
       </div>
       <div className="mt-0.5 text-sm text-ink-soft">
         watching {w.asset}
-        {market && <span className={market.change >= 0 ? "text-up" : "text-down"}> {pct(market.change)}</span>}
         {" · "}
         <span className="inline-flex items-center gap-1">
           <Lock size={11} /> locked
         </span>
       </div>
 
-      <div className="mt-5 grid w-full grid-cols-3 gap-3">
+      <div className="mt-5 grid w-full grid-cols-2 gap-3">
         <Stat label="On duty" value={w.deployedAt ? duration(Date.now() - w.deployedAt) : "—"} />
         <Stat label="Boost" value={`×${cls.modifier}`} />
-        <Stat label="Bloom" value={fmt(w.baseEarned)} accent />
       </div>
+      <p className="mt-3 text-xs text-ink-soft">
+        Earning Bloom while active · rewards engine coming soon
+      </p>
 
       <div className="mt-5">
         {active ? (
@@ -320,14 +315,6 @@ function TasksTab({ setTab }: { setTab: (t: Tab) => void }) {
 
 /* --------------------------------------------------------------- Invites */
 
-const AGENT_LABEL: Record<AgentStatus, string> = {
-  invited: "invited",
-  connected: "connected",
-  wallet_pending: "needs wallet",
-  active: "active",
-  eligible: "eligible",
-};
-
 function InvitesTab() {
   const t = useTerminal();
   const [copied, setCopied] = useState(false);
@@ -363,57 +350,31 @@ function InvitesTab() {
         </Button>
       </div>
 
-      {isBackendConfigured ? (
-        <>
-          <div className="flex items-center justify-between">
-            <span className="pixel text-[0.6rem] text-ink-soft">
-              {t.activeAgents}/{ECONOMY.requiredAgents} active
-            </span>
-            <Button size="sm" onClick={t.refreshInvites}>
-              <RotateCw size={14} /> Refresh
-            </Button>
-          </div>
-          <div className="space-y-2">
-            {t.invites.length === 0 ? (
-              <p className="py-4 text-center text-sm text-ink-soft">
-                No one has joined with your link yet.
-              </p>
-            ) : (
-              t.invites.map((i, idx) => (
-                <div key={idx} className="card-soft flex items-center gap-3 p-2.5">
-                  <StatusDot tone={i.walletVerified ? "live" : "idle"} />
-                  <span className="flex-1 font-bold">@{i.handle}</span>
-                  <Badge variant={i.walletVerified ? "green" : "muted"}>
-                    {i.eligible ? "eligible" : i.walletVerified ? "active" : "joined"}
-                  </Badge>
-                </div>
-              ))
-            )}
-          </div>
-        </>
-      ) : (
-        <>
-          <Button variant="pink" className="w-full" onClick={t.inviteAgent}>
-            <UserPlus size={16} /> Invite a friend
-          </Button>
-          <div className="space-y-2">
-            {t.agents.length === 0 ? (
-              <p className="py-4 text-center text-sm text-ink-soft">No invites yet.</p>
-            ) : (
-              t.agents.map((a) => {
-                const settled = a.status === "active" || a.status === "eligible";
-                return (
-                  <div key={a.id} className="card-soft flex items-center gap-3 p-2.5">
-                    <StatusDot tone={settled ? "live" : a.status === "wallet_pending" ? "warn" : "idle"} />
-                    <span className="flex-1 font-bold">@{a.handle}</span>
-                    <Badge variant={settled ? "green" : "muted"}>{AGENT_LABEL[a.status]}</Badge>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </>
-      )}
+      <div className="flex items-center justify-between">
+        <span className="pixel text-[0.6rem] text-ink-soft">
+          {t.activeAgents}/{ECONOMY.requiredAgents} active
+        </span>
+        <Button size="sm" onClick={t.refreshInvites}>
+          <RotateCw size={14} /> Refresh
+        </Button>
+      </div>
+      <div className="space-y-2">
+        {t.invites.length === 0 ? (
+          <p className="py-4 text-center text-sm text-ink-soft">
+            No one has joined with your link yet.
+          </p>
+        ) : (
+          t.invites.map((i, idx) => (
+            <div key={idx} className="card-soft flex items-center gap-3 p-2.5">
+              <StatusDot tone={i.walletVerified ? "live" : "idle"} />
+              <span className="flex-1 font-bold">@{i.handle}</span>
+              <Badge variant={i.walletVerified ? "green" : "muted"}>
+                {i.eligible ? "eligible" : i.walletVerified ? "active" : "joined"}
+              </Badge>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
@@ -421,13 +382,14 @@ function InvitesTab() {
 /* ---------------------------------------------------------------- Rewards */
 
 function RewardsTab() {
-  const t = useTerminal();
   return (
     <div className="space-y-4">
       <Panel className="text-center">
-        <div className="pixel text-[0.6rem] text-ink-soft">BLOOM EARNED</div>
-        <div className="display mt-1 text-5xl tnum text-green">{fmt(t.displayBalance)}</div>
-        <div className="mt-1 text-xs text-ink-soft">accruing while your agent works</div>
+        <div className="pixel text-[0.6rem] text-ink-soft">BLOOM</div>
+        <div className="display mt-2 text-2xl">Accruing while your agent works</div>
+        <div className="mt-1 text-xs text-ink-soft">
+          The rewards engine goes live soon — balances will appear here then.
+        </div>
       </Panel>
 
       <Panel soft title="Bloom NFT">

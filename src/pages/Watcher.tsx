@@ -1,45 +1,11 @@
-import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { PriceChart, Sparkline } from "@/components/Chart";
-import { series } from "@/lib/chart";
-import { fmt, pct, cn } from "@/lib/utils";
-
-// Robinhood-chain style listings. Demo data for now.
-interface Coin {
-  symbol: string;
-  name: string;
-  price: number;
-  change: number;
-}
-
-const COINS: Coin[] = [
-  { symbol: "NVDA", name: "NVIDIA", price: 184.22, change: 4.21 },
-  { symbol: "TSLA", name: "Tesla", price: 427.18, change: -1.83 },
-  { symbol: "AAPL", name: "Apple", price: 242.91, change: 0.92 },
-  { symbol: "MSFT", name: "Microsoft", price: 512.07, change: 3.72 },
-  { symbol: "GOOGL", name: "Alphabet", price: 201.44, change: 1.38 },
-  { symbol: "AMZN", name: "Amazon", price: 231.6, change: -0.44 },
-  { symbol: "COIN", name: "Coinbase", price: 356.9, change: 6.41 },
-  { symbol: "MSTR", name: "MicroStrategy", price: 402.55, change: 3.72 },
-];
-
-const seed = (s: string) => s.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-const TIMEFRAMES = ["1D", "1W", "1M", "1Y"];
 
 export default function Watcher() {
-  const [active, setActive] = useState(COINS[0].symbol);
-  const [tf, setTf] = useState("1D");
-  const coin = COINS.find((c) => c.symbol === active)!;
-  const chartVals = useMemo(
-    () => series(48, seed(active) + tf.length * 7, 1.2),
-    [active, tf]
-  );
-
   return (
     <div className="mx-auto max-w-2xl px-5 py-5">
-      {/* header */}
       <div className="flex items-center justify-between">
         <Link
           to="/"
@@ -53,69 +19,23 @@ export default function Watcher() {
         </div>
       </div>
 
-      <div className="mt-2 flex items-center gap-2">
-        <h1 className="display text-2xl">Robinhood Watcher</h1>
-        <Badge variant="yellow">Preview</Badge>
-      </div>
-      <p className="text-sm text-ink-soft">Demo data — a live Robinhood feed drops in later.</p>
-
-      {/* featured chart */}
-      <div className="card mt-4 p-4">
-        <div className="flex items-end justify-between">
-          <div>
-            <div className="display text-xl">{coin.symbol}</div>
-            <div className="text-sm text-ink-soft">{coin.name}</div>
-          </div>
-          <div className="text-right">
-            <div className="display text-2xl tnum">${fmt(coin.price)}</div>
-            <div className={cn("text-sm tnum", coin.change >= 0 ? "text-up" : "text-down")}>
-              {pct(coin.change)}
-            </div>
-          </div>
+      <div className="mt-16 flex flex-col items-center text-center">
+        <img
+          src="/robinhood-watcher.png"
+          alt="Robinhood Watcher"
+          className="pixel w-48 drop-shadow-[4px_6px_0_rgba(46,42,58,0.18)]"
+        />
+        <div className="mt-6 flex items-center gap-2">
+          <h1 className="display text-3xl">Robinhood Watcher</h1>
+          <Badge variant="yellow">Coming soon</Badge>
         </div>
-
-        <div className="mt-3">
-          <PriceChart vals={chartVals} up={coin.change >= 0} />
-        </div>
-
-        <div className="mt-3 flex gap-2">
-          {TIMEFRAMES.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTf(t)}
-              className={cn("chip", tf === t && "bg-ink text-screen")}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* listings */}
-      <div className="mt-4 space-y-2">
-        <div className="pixel text-[0.6rem] text-ink-soft">MARKETS</div>
-        {COINS.map((c) => (
-          <button
-            key={c.symbol}
-            onClick={() => setActive(c.symbol)}
-            className={cn(
-              "card-soft flex w-full items-center gap-3 p-3 text-left transition-transform hover:-translate-y-0.5",
-              active === c.symbol && "ring-2 ring-ink"
-            )}
-          >
-            <div className="min-w-0 flex-1">
-              <div className="font-bold">{c.symbol}</div>
-              <div className="truncate text-xs text-ink-soft">{c.name}</div>
-            </div>
-            <Sparkline vals={series(48, seed(c.symbol), 1.2)} up={c.change >= 0} />
-            <div className="w-24 text-right">
-              <div className="tnum text-sm">${fmt(c.price)}</div>
-              <div className={cn("tnum text-xs", c.change >= 0 ? "text-up" : "text-down")}>
-                {pct(c.change)}
-              </div>
-            </div>
-          </button>
-        ))}
+        <p className="mt-2 max-w-sm text-sm text-ink-soft">
+          Live prices, charts and movers for tokenized stocks — plugging into a
+          real feed. Not open yet.
+        </p>
+        <Link to="/" className="mt-6">
+          <Button variant="pink">Back home</Button>
+        </Link>
       </div>
     </div>
   );

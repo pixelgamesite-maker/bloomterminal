@@ -9,8 +9,6 @@ import {
   type ReactNode,
 } from "react";
 import {
-  type Agent,
-  type AgentStatus,
   type MarketKind,
   type Mission,
   type RewardState,
@@ -18,7 +16,7 @@ import {
   type WorkerClass,
 } from "@/lib/types";
 import { ECONOMY } from "@/lib/config";
-import { INITIAL_MISSIONS, SAMPLE_HANDLES, WORKER_CLASSES } from "@/lib/mock";
+import { INITIAL_MISSIONS, WORKER_CLASSES } from "@/lib/catalog";
 import {
   supabase,
   loadProfile,
@@ -45,8 +43,7 @@ interface TerminalState {
   walletConnected: boolean;
   address: string | null;
   missions: Mission[];
-  agents: Agent[];
-  /** Real referred friends, loaded from Supabase when configured. */
+  /** Real referred friends, loaded from Supabase. */
   invites: InviteRow[];
   worker: Worker | null;
   nftMinted: boolean;
@@ -71,8 +68,6 @@ interface TerminalValue extends TerminalState {
   bindWallet: (address: string) => boolean;
   signOut: () => void;
   completeMission: (id: string) => void;
-  inviteAgent: () => void;
-  advanceAgent: (id: string) => void;
   /** Re-fetch the real referred-friends list from Supabase. */
   refreshInvites: () => void;
   createWorker: (cfg: {
@@ -90,14 +85,6 @@ interface TerminalValue extends TerminalState {
 
 const TerminalContext = createContext<TerminalValue | null>(null);
 
-const AGENT_FLOW: AgentStatus[] = [
-  "invited",
-  "connected",
-  "wallet_pending",
-  "active",
-  "eligible",
-];
-
 export function TerminalProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<TerminalState>({
     xConnected: false,
@@ -108,7 +95,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     walletConnected: false,
     address: null,
     missions: INITIAL_MISSIONS,
-    agents: [],
     invites: [],
     worker: null,
     nftMinted: false,
@@ -164,31 +150,11 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  // Reward accrual: tick while a worker is active.
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setState((s) => {
-        if (!s.worker || s.worker.status !== "active") return s;
-        const cls = WORKER_CLASSES.find((c) => c.id === s.worker!.class);
-        const mod = cls?.modifier ?? 1;
-        const gain = ECONOMY.baseRatePerSecond * 0.5 * mod; // 500ms tick
-        return {
-          ...s,
-          worker: { ...s.worker, baseEarned: s.worker.baseEarned + gain },
-        };
-      });
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Keep the wallet + network missions in sync with real state. With a backend
-  // the active count comes from real referred friends (wallet-bound); without
-  // one it falls back to the local demo agents.
+  // Keep the wallet + network tasks in sync. The active count is the number of
+  // real referred friends who have bound a wallet.
   useEffect(() => {
     setState((s) => {
-      const activeAgents = supabase
-        ? s.invites.filter((i) => i.walletVerified).length
-        : s.agents.filter((a) => a.status === "active" || a.status === "eligible").length;
+      const activeAgents = s.invites.filter((i) => i.walletVerified).length;
       const missions = s.missions.map((m) => {
         if (m.id === "bind-wallet") return { ...m, done: s.walletConnected };
         if (m.id === "invite-agents")
@@ -198,7 +164,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       const changed = missions.some((m, i) => m.done !== s.missions[i].done);
       return changed ? { ...s, missions } : s;
     });
-  }, [state.walletConnected, state.agents, state.invites]);
+  }, [state.walletConnected, state.invites]);
 
   useEffect(() => {
     const t = timers.current;
@@ -267,7 +233,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       walletConnected: false,
       address: null,
       missions: INITIAL_MISSIONS,
-      agents: [],
       invites: [],
       worker: null,
       nftMinted: false,
@@ -286,46 +251,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     setState((s) => {
       if (supabase && s.userId) loadInvites(s.userId).then((invites) => setState((p) => ({ ...p, invites })));
       return s;
-    });
-  }, []);
-
-  const advanceAgent = useCallback((id: string) => {
-    setState((s) => ({
-      ...s,
-      agents: s.agents.map((a) => {
-        if (a.id !== id) return a;
-        const idx = AGENT_FLOW.indexOf(a.status);
-        const next = AGENT_FLOW[Math.min(idx + 1, AGENT_FLOW.length - 1)];
-        return { ...a, status: next };
-      }),
-    }));
-  }, []);
-
-  const inviteAgent = useCallback(() => {
-    const id = crypto.randomUUID();
-    const handle =
-      SAMPLE_HANDLES[Math.floor(Math.random() * SAMPLE_HANDLES.length)] +
-      Math.floor(Math.random() * 90 + 10);
-    setState((s) => ({
-      ...s,
-      agents: [...s.agents, { id, handle, status: "invited" }],
-    }));
-    // Simulate the invited user progressing through onboarding.
-    [
-      [900, "connected"],
-      [1700, "wallet_pending"],
-      [2600, "active"],
-      [3500, "eligible"],
-    ].forEach(([delay, status]) => {
-      const t = setTimeout(() => {
-        setState((s) => ({
-          ...s,
-          agents: s.agents.map((a) =>
-            a.id === id ? { ...a, status: status as AgentStatus } : a
-          ),
-        }));
-      }, delay as number);
-      timers.current.push(t);
     });
   }, []);
 
@@ -392,9 +317,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<TerminalValue>(() => {
-    const activeAgents = supabase
-      ? state.invites.filter((i) => i.walletVerified).length
-      : state.agents.filter((a) => a.status === "active" || a.status === "eligible").length;
+    const activeAgents = state.invites.filter((i) => i.walletVerified).length;
     const missionsComplete = state.missions.every((m) => m.done);
     const eligible =
       state.xConnected &&
@@ -425,8 +348,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       bindWallet,
       signOut,
       completeMission,
-      inviteAgent,
-      advanceAgent,
       refreshInvites,
       createWorker,
       deployWorker,
@@ -442,8 +363,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     bindWallet,
     signOut,
     completeMission,
-    inviteAgent,
-    advanceAgent,
     refreshInvites,
     createWorker,
     deployWorker,

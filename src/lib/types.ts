@@ -11,25 +11,12 @@ export interface Mission {
   description: string;
   type: MissionType;
   reward: number;
-  /** Completed in the current (mock) session. */
+  /** Completed in this session. */
   done: boolean;
   /** An external action (opens X, etc.) vs. an in-app action. */
   external?: boolean;
   /** URL opened when verifying an external task. */
   link?: string;
-}
-
-export type AgentStatus =
-  | "invited"
-  | "connected"
-  | "wallet_pending"
-  | "active"
-  | "eligible";
-
-export interface Agent {
-  id: string;
-  handle: string;
-  status: AgentStatus;
 }
 
 export type WorkerClass = "scout" | "analyst" | "momentum" | "sentinel";
@@ -60,8 +47,6 @@ export interface MarketAsset {
   symbol: string;
   name: string;
   kind: MarketKind;
-  price: number;
-  change: number; // percent
 }
 
 export type RewardState =

@@ -1,20 +1,12 @@
 /*
- * Runtime configuration + integration placeholders.
+ * Runtime configuration, read from env.
  *
- * ⚠️ The current build runs on local mock state — no real auth, wallet, or
- * chain calls are made yet. These values are read from env so the real
- * integrations drop in without touching components. Fill them in via
- * .env.local (see .env.example) as each piece is wired:
- *
+ * Auth (X OAuth), the user profile, wallet binding and referrals all run
+ * against Supabase when these are set. The worker and tasks are session
+ * state (not yet persisted). Set these via .env.local locally and in the
+ * hosting provider for production:
  *   - Supabase: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
- *       Then install @supabase/supabase-js and create src/lib/supabase.ts.
- *   - Wallet:   VITE_WALLETCONNECT_PROJECT_ID (+ chain id / rpc)
- *       Then install wagmi + @rainbow-me/rainbowkit + viem and wire a
- *       WagmiProvider/RainbowKitProvider around <App/>.
- *
- * Note: RainbowKit throws at startup without a real WalletConnect project
- * id, which is exactly why wallet connect is mocked for now rather than
- * booted with a placeholder.
+ *   - Wallet (future onchain signing): VITE_WALLETCONNECT_PROJECT_ID + chain
  */
 
 export const env = {
@@ -31,11 +23,9 @@ export const isWalletConfigured = Boolean(env.walletConnectProjectId);
 
 // --- Economy parameters (backend-configurable in production) ---
 export const ECONOMY = {
-  /** Base Bloom produced per worker per real second while deployed (demo rate). */
-  baseRatePerSecond: 0.12,
-  /** Multiplier granted by holding the Bloom NFT. */
+  /** Multiplier granted by holding the Bloom NFT (applies once minting is live). */
   nftMultiplier: 1.25,
-  /** How many eligible agents a terminal needs. */
+  /** How many active referred friends a terminal needs. */
   requiredAgents: 2,
 };
 
