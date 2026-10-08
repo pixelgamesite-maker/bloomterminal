@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import Landing from "@/pages/Landing";
 import Console from "@/pages/Console";
 import Watcher from "@/pages/Watcher";
+import Join from "@/pages/Join";
 import { LOGO } from "@/lib/art";
 
 function Gate({ children }: { children: ReactNode }) {
@@ -28,6 +29,8 @@ export default function App() {
         <CrtFrame>
           <Routes>
             <Route path="/" element={<Landing />} />
+            {/* Referral invite link target */}
+            <Route path="/join/:code" element={<Join />} />
             {/* Public — no X auth needed */}
             <Route path="/watcher" element={<Watcher />} />
             <Route

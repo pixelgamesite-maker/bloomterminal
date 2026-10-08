@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Copy, Check, UserPlus, Lock, ExternalLink, Pause, Play } from "lucide-react";
+import { Copy, Check, UserPlus, Lock, ExternalLink, Pause, Play, RotateCw } from "lucide-react";
 import { useTerminal } from "@/state/terminal";
 import { ProfileMenu } from "@/components/ProfileMenu";
 import { TvArt } from "@/components/TvArt";
@@ -16,7 +16,7 @@ import {
   findAsset,
 } from "@/lib/mock";
 import { CLASS_ART, LOGO } from "@/lib/art";
-import { ECONOMY, BRAND } from "@/lib/config";
+import { ECONOMY, BRAND, isBackendConfigured } from "@/lib/config";
 import type { AgentStatus, MarketKind, WorkerClass } from "@/lib/types";
 import { cn, fmt, pct, duration } from "@/lib/utils";
 
@@ -333,6 +333,12 @@ function InvitesTab() {
   const [copied, setCopied] = useState(false);
   const link = `${BRAND.joinBase}/${(t.handle ?? "you").toUpperCase()}`;
 
+  // Pull the latest referred-friends list when the tab opens.
+  useEffect(() => {
+    t.refreshInvites();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function copy() {
     navigator.clipboard?.writeText(link).catch(() => {});
     setCopied(true);
@@ -343,7 +349,9 @@ function InvitesTab() {
     <div className="space-y-4">
       <div className="text-center">
         <h2 className="display text-xl">Invite {ECONOMY.requiredAgents} friends</h2>
-        <p className="mt-1 text-sm text-ink-soft">They count once they're active.</p>
+        <p className="mt-1 text-sm text-ink-soft">
+          Share your link. A friend counts once they sign in and bind a wallet.
+        </p>
       </div>
 
       <div className="flex items-center gap-2">
@@ -355,26 +363,57 @@ function InvitesTab() {
         </Button>
       </div>
 
-      <Button variant="pink" className="w-full" onClick={t.inviteAgent}>
-        <UserPlus size={16} /> Invite a friend
-      </Button>
-
-      <div className="space-y-2">
-        {t.agents.length === 0 ? (
-          <p className="py-4 text-center text-sm text-ink-soft">No invites yet.</p>
-        ) : (
-          t.agents.map((a) => {
-            const settled = a.status === "active" || a.status === "eligible";
-            return (
-              <div key={a.id} className="card-soft flex items-center gap-3 p-2.5">
-                <StatusDot tone={settled ? "live" : a.status === "wallet_pending" ? "warn" : "idle"} />
-                <span className="flex-1 font-bold">@{a.handle}</span>
-                <Badge variant={settled ? "green" : "muted"}>{AGENT_LABEL[a.status]}</Badge>
-              </div>
-            );
-          })
-        )}
-      </div>
+      {isBackendConfigured ? (
+        <>
+          <div className="flex items-center justify-between">
+            <span className="pixel text-[0.6rem] text-ink-soft">
+              {t.activeAgents}/{ECONOMY.requiredAgents} active
+            </span>
+            <Button size="sm" onClick={t.refreshInvites}>
+              <RotateCw size={14} /> Refresh
+            </Button>
+          </div>
+          <div className="space-y-2">
+            {t.invites.length === 0 ? (
+              <p className="py-4 text-center text-sm text-ink-soft">
+                No one has joined with your link yet.
+              </p>
+            ) : (
+              t.invites.map((i, idx) => (
+                <div key={idx} className="card-soft flex items-center gap-3 p-2.5">
+                  <StatusDot tone={i.walletVerified ? "live" : "idle"} />
+                  <span className="flex-1 font-bold">@{i.handle}</span>
+                  <Badge variant={i.walletVerified ? "green" : "muted"}>
+                    {i.eligible ? "eligible" : i.walletVerified ? "active" : "joined"}
+                  </Badge>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          <Button variant="pink" className="w-full" onClick={t.inviteAgent}>
+            <UserPlus size={16} /> Invite a friend
+          </Button>
+          <div className="space-y-2">
+            {t.agents.length === 0 ? (
+              <p className="py-4 text-center text-sm text-ink-soft">No invites yet.</p>
+            ) : (
+              t.agents.map((a) => {
+                const settled = a.status === "active" || a.status === "eligible";
+                return (
+                  <div key={a.id} className="card-soft flex items-center gap-3 p-2.5">
+                    <StatusDot tone={settled ? "live" : a.status === "wallet_pending" ? "warn" : "idle"} />
+                    <span className="flex-1 font-bold">@{a.handle}</span>
+                    <Badge variant={settled ? "green" : "muted"}>{AGENT_LABEL[a.status]}</Badge>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -19,7 +19,15 @@ import {
 } from "@/lib/types";
 import { ECONOMY } from "@/lib/config";
 import { INITIAL_MISSIONS, SAMPLE_HANDLES, WORKER_CLASSES } from "@/lib/mock";
-import { supabase, loadProfile } from "@/lib/supabase";
+import {
+  supabase,
+  loadProfile,
+  attributeReferral,
+  loadInvites,
+  pushEligibility,
+  type InviteRow,
+} from "@/lib/supabase";
+import { captureRefFromUrl } from "@/lib/referral";
 
 /*
  * The terminal store. Auth is real X OAuth via Supabase when configured.
@@ -31,12 +39,15 @@ import { supabase, loadProfile } from "@/lib/supabase";
 interface TerminalState {
   xConnected: boolean;
   authLoading: boolean;
+  userId: string | null;
   handle: string | null;
   avatar: string | null;
   walletConnected: boolean;
   address: string | null;
   missions: Mission[];
   agents: Agent[];
+  /** Real referred friends, loaded from Supabase when configured. */
+  invites: InviteRow[];
   worker: Worker | null;
   nftMinted: boolean;
   claimedTotal: number;
@@ -62,6 +73,8 @@ interface TerminalValue extends TerminalState {
   completeMission: (id: string) => void;
   inviteAgent: () => void;
   advanceAgent: (id: string) => void;
+  /** Re-fetch the real referred-friends list from Supabase. */
+  refreshInvites: () => void;
   createWorker: (cfg: {
     cls: WorkerClass;
     kind: MarketKind;
@@ -89,12 +102,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<TerminalState>({
     xConnected: false,
     authLoading: Boolean(supabase), // wait for Supabase to resolve the session
+    userId: null,
     handle: null,
     avatar: null,
     walletConnected: false,
     address: null,
     missions: INITIAL_MISSIONS,
     agents: [],
+    invites: [],
     worker: null,
     nftMinted: false,
     claimedTotal: 0,
@@ -105,10 +120,11 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   // Real X auth via Supabase: hydrate from the session, then keep in sync.
   useEffect(() => {
     if (!supabase) return;
+    captureRefFromUrl(); // pick up ?ref= if present
 
     async function hydrate(userId: string | undefined, meta?: Record<string, unknown>) {
       if (!userId) {
-        setState((s) => ({ ...s, xConnected: false, handle: null, avatar: null, authLoading: false }));
+        setState((s) => ({ ...s, xConnected: false, userId: null, handle: null, avatar: null, authLoading: false }));
         return;
       }
       const profile = await loadProfile(userId);
@@ -124,11 +140,17 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         ...s,
         xConnected: true,
         authLoading: false,
+        userId,
         handle,
         avatar: avatar ? avatar.replace("_normal", "_400x400") : null,
         walletConnected: Boolean(profile?.wallet_address && profile?.wallet_verified) || s.walletConnected,
         address: profile?.wallet_address ?? s.address,
       }));
+
+      // Attribute any pending referral, then load the real referred list.
+      await attributeReferral(userId, handle);
+      const invites = await loadInvites(userId);
+      setState((s) => ({ ...s, invites }));
     }
 
     supabase.auth.getSession().then(({ data }) => {
@@ -159,28 +181,44 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(interval);
   }, []);
 
-  // Keep the wallet + network missions in sync with real state.
+  // Keep the wallet + network missions in sync with real state. With a backend
+  // the active count comes from real referred friends (wallet-bound); without
+  // one it falls back to the local demo agents.
   useEffect(() => {
     setState((s) => {
-      const activeAgents = s.agents.filter(
-        (a) => a.status === "active" || a.status === "eligible"
-      ).length;
+      const activeAgents = supabase
+        ? s.invites.filter((i) => i.walletVerified).length
+        : s.agents.filter((a) => a.status === "active" || a.status === "eligible").length;
       const missions = s.missions.map((m) => {
         if (m.id === "bind-wallet") return { ...m, done: s.walletConnected };
         if (m.id === "invite-agents")
           return { ...m, done: activeAgents >= ECONOMY.requiredAgents };
         return m;
       });
-      // avoid redundant updates
       const changed = missions.some((m, i) => m.done !== s.missions[i].done);
       return changed ? { ...s, missions } : s;
     });
-  }, [state.walletConnected, state.agents]);
+  }, [state.walletConnected, state.agents, state.invites]);
 
   useEffect(() => {
     const t = timers.current;
     return () => t.forEach(clearTimeout);
   }, []);
+
+  // Mirror eligibility to the profile so an inviter can see this user "count".
+  const lastEligible = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (!supabase || !state.userId) return;
+    const activeAgents = state.invites.filter((i) => i.walletVerified).length;
+    const eligible =
+      state.walletConnected &&
+      state.missions.every((m) => m.done) &&
+      activeAgents >= ECONOMY.requiredAgents;
+    if (lastEligible.current !== eligible) {
+      lastEligible.current = eligible;
+      pushEligibility(state.userId, eligible);
+    }
+  }, [state.userId, state.walletConnected, state.missions, state.invites]);
 
   const signInWithX = useCallback(async () => {
     if (supabase) {
@@ -223,12 +261,14 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     setState({
       xConnected: false,
       authLoading: false,
+      userId: null,
       handle: null,
       avatar: null,
       walletConnected: false,
       address: null,
       missions: INITIAL_MISSIONS,
       agents: [],
+      invites: [],
       worker: null,
       nftMinted: false,
       claimedTotal: 0,
@@ -240,6 +280,13 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       ...s,
       missions: s.missions.map((m) => (m.id === id ? { ...m, done: true } : m)),
     }));
+  }, []);
+
+  const refreshInvites = useCallback(() => {
+    setState((s) => {
+      if (supabase && s.userId) loadInvites(s.userId).then((invites) => setState((p) => ({ ...p, invites })));
+      return s;
+    });
   }, []);
 
   const advanceAgent = useCallback((id: string) => {
@@ -345,9 +392,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<TerminalValue>(() => {
-    const activeAgents = state.agents.filter(
-      (a) => a.status === "active" || a.status === "eligible"
-    ).length;
+    const activeAgents = supabase
+      ? state.invites.filter((i) => i.walletVerified).length
+      : state.agents.filter((a) => a.status === "active" || a.status === "eligible").length;
     const missionsComplete = state.missions.every((m) => m.done);
     const eligible =
       state.xConnected &&
@@ -380,6 +427,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       completeMission,
       inviteAgent,
       advanceAgent,
+      refreshInvites,
       createWorker,
       deployWorker,
       pauseWorker,
@@ -396,6 +444,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     completeMission,
     inviteAgent,
     advanceAgent,
+    refreshInvites,
     createWorker,
     deployWorker,
     pauseWorker,
