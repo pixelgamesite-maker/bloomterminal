@@ -53,9 +53,27 @@ export default function Landing() {
             Bloom is an onchain market terminal. Pick a little agent, point it at
             a market, and it earns Bloom while you're away.
           </p>
-          <Button variant="pink" size="lg" className="mt-5" onClick={() => setSigningIn(true)}>
-            Register a Worker
-          </Button>
+          <div className="mt-5 flex w-full flex-col items-center gap-2.5">
+            <Button
+              variant="blue"
+              size="lg"
+              className="w-full max-w-xs"
+              onClick={() => navigate("/watcher")}
+            >
+              <Eye size={18} className="mr-2" /> Open the Watcher
+            </Button>
+            <Button
+              variant="pink"
+              size="lg"
+              className="w-full max-w-xs"
+              onClick={() => setSigningIn(true)}
+            >
+              Register a Worker
+            </Button>
+            <span className="text-[0.65rem] text-ink-soft">
+              Watcher is public · registering needs X
+            </span>
+          </div>
         </div>
 
         {/* how it works */}
