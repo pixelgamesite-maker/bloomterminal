@@ -119,7 +119,7 @@ function useFeed(market: Market) {
 /* ---------------- top bar ---------------- */
 
 function TopBar({ market }: { market: Market }) {
-  const label = market === "stocks" ? "ROBINHOOD CHAIN · 4663" : "CRYPTO · TOP 50 · USD";
+  const label = market === "stocks" ? "ROBINHOOD CHAIN · STOCKS" : "ROBINHOOD CHAIN · PONS";
   return (
     <div className="sticky top-0 z-30 border-b-2 border-ink bg-screen/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
@@ -307,7 +307,7 @@ function TokensTab({ feed, market }: { feed: Feed; market: Market }) {
                   <SortTh label="Market" k="symbol" sort={sort} onSort={toggleSort} align="left" />
                   <SortTh label="Price" k="mid" sort={sort} onSort={toggleSort} />
                   <SortTh label="24h" k="change" sort={sort} onSort={toggleSort} />
-                  <th className="hidden sm:table-cell" style={{ width: 84 }}>Trend</th>
+                  {!isCrypto && <th className="hidden sm:table-cell" style={{ width: 84 }}>Trend</th>}
                   {isCrypto ? (
                     <SortTh label="Mkt cap" k="mcap" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
                   ) : (
@@ -341,7 +341,7 @@ function TokensTab({ feed, market }: { feed: Feed; market: Market }) {
 
       <p className="mt-3 text-center text-[0.65rem] text-ink-soft">
         {isCrypto
-          ? "Prices from CoinGecko, for information only, not a quote to trade."
+          ? "Robinhood Chain tokens priced from their DEX pools. Highly volatile, info only, not a quote to trade."
           : "Prices from Robinhood Chain, for information only, not a quote to trade."}
       </p>
     </div>
@@ -402,11 +402,13 @@ function Row({ t, rank, flash, tick, isCrypto }: { t: Token; rank: number; flash
       <td className={`num display text-sm ${t.change24h == null ? "text-ink-soft" : t.change24h >= 0 ? "text-up" : "text-down"}`}>
         {fmtPct(t.change24h)}
       </td>
-      <td className="hidden sm:table-cell">
-        <div className="flex justify-end">
-          <Sparkline data={t.spark} up={t.change24h == null ? null : t.change24h >= 0} />
-        </div>
-      </td>
+      {!isCrypto && (
+        <td className="hidden sm:table-cell">
+          <div className="flex justify-end">
+            <Sparkline data={t.spark} up={t.change24h == null ? null : t.change24h >= 0} />
+          </div>
+        </td>
+      )}
       {isCrypto ? (
         <td className="num hidden text-ink-soft md:table-cell">{fmtUsdCompact(t.marketCap)}</td>
       ) : (
