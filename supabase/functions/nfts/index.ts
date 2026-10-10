@@ -121,22 +121,44 @@ async function resolveChain(): Promise<string> {
 
 interface OsCollection { collection: string; name?: string; image_url?: string; total_supply?: number; description?: string }
 
-async function listAllCollections(chain: string): Promise<OsCollection[]> {
-  const out: OsCollection[] = [];
+// OpenSea's /collections catalog returns ~100 rows per ordering with little
+// pagination, and the default (newest) ordering misses established markets.
+// So we union several orderings to cover both new AND top-by-volume/mcap.
+const ORDER_BYS = ["market_cap", "seven_day_volume", "one_day_change", "created_date"];
+
+async function listPass(chain: string, orderBy: string, pages: number) {
+  const rows: OsCollection[] = [];
   let next = "";
-  for (let i = 0; i < MAX_PAGES; i++) {
-    // The `next` cursor can contain characters that must be URL-encoded,
-    // otherwise page 2 400s and we silently stop at the newest 100.
-    const url = `${OS}/collections?chain=${encodeURIComponent(chain)}&limit=100${next ? `&next=${encodeURIComponent(next)}` : ""}`;
+  let ok = true;
+  for (let i = 0; i < pages; i++) {
+    const url =
+      `${OS}/collections?chain=${encodeURIComponent(chain)}&limit=100` +
+      (orderBy ? `&order_by=${orderBy}` : "") +
+      (next ? `&next=${encodeURIComponent(next)}` : "");
     const r = await fetch(url, { headers: osHeaders() });
-    if (!r.ok) break;
+    if (!r.ok) { ok = false; break; }
     const j = await r.json();
-    const rows: OsCollection[] = j?.collections ?? [];
-    out.push(...rows);
+    const page: OsCollection[] = j?.collections ?? [];
+    rows.push(...page);
     next = j?.next ?? "";
-    if (!next || !rows.length) break;
+    if (!next || !page.length) break;
   }
-  return out;
+  return { ok, rows };
+}
+
+async function collectUnion(chain: string): Promise<{ all: OsCollection[]; report: Record<string, number | boolean | string>[] }> {
+  const seen = new Map<string, OsCollection>();
+  const report: Record<string, number | boolean | string>[] = [];
+  for (const ob of ["", ...ORDER_BYS]) {
+    const { ok, rows } = await listPass(chain, ob, ob === "" || ob === "created_date" ? MAX_PAGES : 4);
+    for (const c of rows) if (c?.collection && !seen.has(c.collection)) seen.set(c.collection, c);
+    report.push({ order: ob || "default", ok, got: rows.length, total: seen.size });
+  }
+  return { all: [...seen.values()], report };
+}
+
+async function listAllCollections(chain: string): Promise<OsCollection[]> {
+  return (await collectUnion(chain)).all;
 }
 
 async function statsFor(c: OsCollection): Promise<NftCollection | null> {
@@ -240,6 +262,26 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   const slug = url.searchParams.get("slug");
   const force = url.searchParams.get("refresh") === "1";
+  const debug = url.searchParams.get("debug") === "1";
+
+  // ---- debug: what does each OpenSea ordering return? (no stats/upsert) ----
+  if (debug) {
+    try {
+      const chain = await resolveChain();
+      const { all, report } = await collectUnion(chain);
+      const names = all.map((c) => c.collection);
+      return json({
+        chain,
+        uniqueCollections: all.length,
+        report,
+        hasQuotrons: names.some((n) => /quotron/i.test(n)),
+        hasRhMachines: names.some((n) => /machine/i.test(n)),
+        sample: names.slice(0, 20),
+      });
+    } catch (err) {
+      return json({ error: String(err) }, 502);
+    }
+  }
 
   // ---- detail: live single collection ----
   if (slug) {
@@ -274,11 +316,10 @@ Deno.serve(async (req: Request) => {
       return json({ collections: live, count: live.length, generatedAt: new Date().toISOString(), source: "live" });
     }
 
-    // Force a full re-index (used after a fix / to repopulate). Progressive
-    // upserts mean even a partial run improves the table.
-    if (force) {
-      await refreshAll();
-    }
+    // Force a full re-index (used after a fix / to repopulate). Runs in the
+    // background; progressive upserts mean the table fills over the next
+    // read or two even if one pass doesn't finish.
+    if (force) background(refreshAll());
 
     const { data, error } = await sb
       .from("nft_collections")
