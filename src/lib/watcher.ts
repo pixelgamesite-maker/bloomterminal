@@ -47,8 +47,13 @@ export interface NftCollection {
   owners: number | null;
   items: number | null;
   url: string;
+  // USD-normalized (floors/volumes come in mixed tokens: ETH, USDG, ...)
+  floorUsd?: number | null;
+  oneDayVolumeUsd?: number | null;
+  totalVolumeUsd?: number | null;
   // present on the detail endpoint
   sevenDayVolume?: number | null;
+  sevenDayVolumeUsd?: number | null;
   thirtyDayVolume?: number | null;
   sales?: number | null;
   description?: string | null;

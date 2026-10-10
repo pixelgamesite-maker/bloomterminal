@@ -44,8 +44,12 @@ interface NftCollection {
   owners: number | null;
   items: number | null;
   url: string;
+  floorUsd?: number | null;
+  oneDayVolumeUsd?: number | null;
+  totalVolumeUsd?: number | null;
   // detail-only extras
   sevenDayVolume?: number | null;
+  sevenDayVolumeUsd?: number | null;
   thirtyDayVolume?: number | null;
   sales?: number | null;
   description?: string | null;
@@ -54,6 +58,47 @@ interface NftCollection {
 function num(v: unknown): number | null {
   const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
   return Number.isFinite(n) ? n : null;
+}
+
+// ---- USD normalization (floors/volumes come in ETH, USDG, ... ) ----
+const STABLES = new Set(["USDG", "USDC", "USDT", "DAI", "USD", "GUSD"]);
+let ethCache: { usd: number; at: number } | null = null;
+
+async function getEthUsd(): Promise<number | null> {
+  if (ethCache && Date.now() - ethCache.at < 5 * 60 * 1000) return ethCache.usd;
+  try {
+    const r = await fetch("https://api.coinbase.com/v2/prices/ETH-USD/spot", { headers: { accept: "application/json" } });
+    if (r.ok) {
+      const j = await r.json();
+      const p = num(j?.data?.amount);
+      if (p) { ethCache = { usd: p, at: Date.now() }; return p; }
+    }
+  } catch { /* ignore */ }
+  return ethCache?.usd ?? null;
+}
+
+function toUsd(amount: number | null, symbol: string | null, eth: number | null): number | null {
+  if (amount == null) return null;
+  const s = (symbol ?? "").toUpperCase();
+  if (STABLES.has(s)) return amount;
+  if (s === "ETH" || s === "WETH") return eth != null ? amount * eth : null;
+  return null; // unknown token: can't price in USD
+}
+
+/** Attach USD-normalized figures so the Watcher can rank across currencies. */
+function priceUsd(c: NftCollection, eth: number | null): NftCollection {
+  return {
+    ...c,
+    floorUsd: toUsd(c.floor, c.floorSymbol, eth),
+    oneDayVolumeUsd: toUsd(c.oneDayVolume, c.floorSymbol, eth),
+    totalVolumeUsd: toUsd(c.totalVolume, c.floorSymbol, eth),
+    sevenDayVolumeUsd: toUsd(c.sevenDayVolume ?? null, c.floorSymbol, eth),
+  };
+}
+
+/** Drop clearly-dead/empty collections (the "just minted, no one here" noise). */
+function isReal(c: NftCollection): boolean {
+  return (c.owners ?? 0) >= 5 || (c.totalVolume ?? 0) > 0 || (c.oneDayVolume ?? 0) > 0;
 }
 
 let chainCache: { slug: string; at: number } | null = null;
@@ -179,6 +224,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: "NFT feed needs an OpenSea API key. Set OPENSEA_API_KEY in Supabase secrets." }, 503);
   }
 
+  const eth = await getEthUsd();
   const url = new URL(req.url);
   const slug = url.searchParams.get("slug");
 
@@ -195,7 +241,7 @@ Deno.serve(async (req: Request) => {
         description: col?.description,
       });
       if (!detail) return json({ error: "collection not found" }, 404);
-      return json({ collection: detail, generatedAt: new Date().toISOString() });
+      return json({ collection: priceUsd(detail, eth), generatedAt: new Date().toISOString() });
     } catch (err) {
       return json({ error: "detail unavailable", detail: String(err) }, 502);
     }
@@ -207,8 +253,11 @@ Deno.serve(async (req: Request) => {
       // No DB configured: fall back to a live top slice so the tab still works.
       const chain = await resolveChain();
       const base = (await listAllCollections(chain)).slice(0, 50);
-      const live = (await mapLimit(base, STATS_CONCURRENCY, statsFor)).filter((x): x is NftCollection => !!x);
-      live.sort((a, b) => (b.floor ?? -1) - (a.floor ?? -1));
+      const live = (await mapLimit(base, STATS_CONCURRENCY, statsFor))
+        .filter((x): x is NftCollection => !!x)
+        .map((c) => priceUsd(c, eth))
+        .filter(isReal);
+      live.sort((a, b) => (b.floorUsd ?? -1) - (a.floorUsd ?? -1));
       return json({ collections: live, count: live.length, generatedAt: new Date().toISOString(), source: "live" });
     }
 
@@ -220,7 +269,7 @@ Deno.serve(async (req: Request) => {
     if (error) throw error;
 
     const rows = (data as Row[]) ?? [];
-    const collections = rows.map(rowToCollection);
+    const collections = rows.map(rowToCollection).map((c) => priceUsd(c, eth)).filter(isReal);
     const newest = rows.reduce((m, r) => Math.max(m, Date.parse(r.updated_at)), 0);
     const stale = !rows.length || Date.now() - newest > FRESH_TTL;
 
@@ -229,7 +278,7 @@ Deno.serve(async (req: Request) => {
       await refreshAll();
       const { data: d2 } = await sb
         .from("nft_collections").select("*").order("floor", { ascending: false, nullsFirst: false }).limit(2000);
-      const c2 = ((d2 as Row[]) ?? []).map(rowToCollection);
+      const c2 = ((d2 as Row[]) ?? []).map(rowToCollection).map((c) => priceUsd(c, eth)).filter(isReal);
       return json({ collections: c2, count: c2.length, generatedAt: new Date().toISOString(), source: "fresh" });
     }
 

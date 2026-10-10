@@ -555,7 +555,7 @@ function NftsTab() {
       ? cols.filter((c) => c.name.toLowerCase().includes(needle) || c.slug.toLowerCase().includes(needle))
       : cols.slice();
     const key = (c: NftCollection) =>
-      sort === "floor" ? c.floor ?? -1 : sort === "volume" ? c.oneDayVolume ?? -1 : c.owners ?? -1;
+      sort === "floor" ? c.floorUsd ?? -1 : sort === "volume" ? c.oneDayVolumeUsd ?? -1 : c.owners ?? -1;
     filtered.sort((a, b) => key(b) - key(a));
     return filtered;
   }, [cols, q, sort]);
@@ -584,7 +584,7 @@ function NftsTab() {
       </div>
 
       <div className="mt-2 flex items-center justify-between text-xs text-ink-soft">
-        <span>{cols ? `${rows?.length ?? 0} collections on Robinhood Chain · by ${sort === "volume" ? "24h volume" : sort}` : "Loading collections…"}</span>
+        <span>{cols ? `${rows?.length ?? 0} active collections · by ${sort === "volume" ? "24h volume" : sort} · USD` : "Loading collections…"}</span>
         {updatedAt && <span>Updated {updatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
       </div>
 
@@ -643,10 +643,10 @@ function NftCard({ c, onOpen }: { c: NftCollection; onOpen: () => void }) {
       <div className="flex flex-1 flex-col p-2.5">
         <div className="display truncate text-sm leading-tight">{c.name}</div>
         <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[0.68rem]">
-          <Stat label="Floor" value={fmtNative(c.floor, c.floorSymbol)} strong />
-          <Stat label="24h vol" value={fmtNative(c.oneDayVolume, c.floorSymbol)} />
+          <Stat label="Floor" value={fmtUsd(c.floorUsd ?? null)} strong />
+          <Stat label="24h vol" value={fmtUsdCompact(c.oneDayVolumeUsd)} />
           <Stat label="Owners" value={fmtInt(c.owners)} />
-          <Stat label="Items" value={fmtInt(c.items)} />
+          <Stat label="Total vol" value={fmtUsdCompact(c.totalVolumeUsd)} />
         </div>
       </div>
     </button>
@@ -702,12 +702,12 @@ function NftDetailModal({ c, onClose }: { c: NftCollection; onClose: () => void 
         <div className="p-4">
           {/* stat grid */}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <Tile label="Floor" value={fmtNative(detail.floor, sym)} strong />
-            <Tile label="24h volume" value={fmtNative(detail.oneDayVolume, sym)} />
-            <Tile label="7d volume" value={fmtNative(detail.sevenDayVolume ?? null, sym)} />
-            <Tile label="Total volume" value={fmtNative(detail.totalVolume, sym)} />
+            <Tile label="Floor" value={fmtUsd(detail.floorUsd ?? null)} sub={fmtNative(detail.floor, sym)} strong />
+            <Tile label="24h volume" value={fmtUsdCompact(detail.oneDayVolumeUsd)} />
+            <Tile label="7d volume" value={fmtUsdCompact(detail.sevenDayVolumeUsd)} />
+            <Tile label="Total volume" value={fmtUsdCompact(detail.totalVolumeUsd)} />
             <Tile label="Owners" value={fmtInt(detail.owners)} />
-            <Tile label="Items" value={fmtInt(detail.items)} />
+            <Tile label={detail.items != null ? "Items" : "Sales"} value={detail.items != null ? fmtInt(detail.items) : fmtInt(detail.sales ?? null)} />
           </div>
 
           {detail.description && (
@@ -730,11 +730,12 @@ function NftDetailModal({ c, onClose }: { c: NftCollection; onClose: () => void 
   );
 }
 
-function Tile({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+function Tile({ label, value, sub, strong }: { label: string; value: string; sub?: string; strong?: boolean }) {
   return (
     <div className="card-soft px-3 py-2">
       <div className="text-[0.58rem] uppercase tracking-wide text-ink-soft">{label}</div>
       <div className={`mt-0.5 tabular-nums ${strong ? "display text-base" : "text-sm font-bold"}`}>{value}</div>
+      {sub && sub !== "-" && <div className="text-[0.58rem] tabular-nums text-ink-soft">{sub}</div>}
     </div>
   );
 }
