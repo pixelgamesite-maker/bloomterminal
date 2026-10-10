@@ -22,8 +22,8 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const FRESH_TTL = 15 * 60 * 1000; // refresh the table at most this often
-const MAX_PAGES = 40; // collections pages (100 each) = safety cap
-const STATS_CONCURRENCY = 8;
+const MAX_PAGES = 60; // collections pages (100 each) = safety cap
+const STATS_CONCURRENCY = 10;
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -96,9 +96,9 @@ function priceUsd(c: NftCollection, eth: number | null): NftCollection {
   };
 }
 
-/** Drop clearly-dead/empty collections (the "just minted, no one here" noise). */
+/** Drop dead/empty collections (the "just minted, 2 owners, no trades" noise). */
 function isReal(c: NftCollection): boolean {
-  return (c.owners ?? 0) >= 5 || (c.totalVolume ?? 0) > 0 || (c.oneDayVolume ?? 0) > 0;
+  return (c.owners ?? 0) >= 10 || (c.oneDayVolumeUsd ?? 0) >= 1 || (c.totalVolumeUsd ?? 0) >= 5;
 }
 
 let chainCache: { slug: string; at: number } | null = null;
@@ -125,7 +125,9 @@ async function listAllCollections(chain: string): Promise<OsCollection[]> {
   const out: OsCollection[] = [];
   let next = "";
   for (let i = 0; i < MAX_PAGES; i++) {
-    const url = `${OS}/collections?chain=${encodeURIComponent(chain)}&limit=100${next ? `&next=${next}` : ""}`;
+    // The `next` cursor can contain characters that must be URL-encoded,
+    // otherwise page 2 400s and we silently stop at the newest 100.
+    const url = `${OS}/collections?chain=${encodeURIComponent(chain)}&limit=100${next ? `&next=${encodeURIComponent(next)}` : ""}`;
     const r = await fetch(url, { headers: osHeaders() });
     if (!r.ok) break;
     const j = await r.json();
@@ -174,21 +176,31 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
   return out;
 }
 
-/** Full refresh: pull every collection + stats, upsert into the table. */
+let refreshing = false;
+
+/**
+ * Full refresh: pull every collection + stats, upserting progressively so a
+ * long index survives an early exit (partial data persists, next run resumes).
+ */
 async function refreshAll(): Promise<void> {
-  if (!sb) return;
-  const chain = await resolveChain();
-  const base = await listAllCollections(chain);
-  const stats = (await mapLimit(base, STATS_CONCURRENCY, statsFor)).filter((x): x is NftCollection => !!x);
-  if (!stats.length) return;
-  const now = new Date().toISOString();
-  const rows = stats.map((c) => ({
-    slug: c.slug, name: c.name, image: c.image, floor: c.floor, floor_symbol: c.floorSymbol,
-    one_day_volume: c.oneDayVolume, total_volume: c.totalVolume, owners: c.owners, items: c.items, updated_at: now,
-  }));
-  // upsert in chunks to stay under payload limits
-  for (let i = 0; i < rows.length; i += 200) {
-    await sb.from("nft_collections").upsert(rows.slice(i, i + 200), { onConflict: "slug" });
+  if (!sb || refreshing) return;
+  refreshing = true;
+  try {
+    const chain = await resolveChain();
+    const base = await listAllCollections(chain);
+    for (let i = 0; i < base.length; i += STATS_CONCURRENCY) {
+      const chunk = base.slice(i, i + STATS_CONCURRENCY);
+      const res = (await Promise.all(chunk.map(statsFor))).filter((x): x is NftCollection => !!x);
+      if (!res.length) continue;
+      const now = new Date().toISOString();
+      const rows = res.map((c) => ({
+        slug: c.slug, name: c.name, image: c.image, floor: c.floor, floor_symbol: c.floorSymbol,
+        one_day_volume: c.oneDayVolume, total_volume: c.totalVolume, owners: c.owners, items: c.items, updated_at: now,
+      }));
+      await sb.from("nft_collections").upsert(rows, { onConflict: "slug" });
+    }
+  } finally {
+    refreshing = false;
   }
 }
 
@@ -227,6 +239,7 @@ Deno.serve(async (req: Request) => {
   const eth = await getEthUsd();
   const url = new URL(req.url);
   const slug = url.searchParams.get("slug");
+  const force = url.searchParams.get("refresh") === "1";
 
   // ---- detail: live single collection ----
   if (slug) {
@@ -259,6 +272,12 @@ Deno.serve(async (req: Request) => {
         .filter(isReal);
       live.sort((a, b) => (b.floorUsd ?? -1) - (a.floorUsd ?? -1));
       return json({ collections: live, count: live.length, generatedAt: new Date().toISOString(), source: "live" });
+    }
+
+    // Force a full re-index (used after a fix / to repopulate). Progressive
+    // upserts mean even a partial run improves the table.
+    if (force) {
+      await refreshAll();
     }
 
     const { data, error } = await sb
