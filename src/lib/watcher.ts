@@ -47,6 +47,11 @@ export interface NftCollection {
   owners: number | null;
   items: number | null;
   url: string;
+  // present on the detail endpoint
+  sevenDayVolume?: number | null;
+  thirtyDayVolume?: number | null;
+  sales?: number | null;
+  description?: string | null;
 }
 
 export interface NftsResponse {
@@ -97,6 +102,23 @@ export async function fetchNfts(signal?: AbortSignal): Promise<NftsResponse> {
     throw new WatcherError(data.error ?? `Feed returned ${res.status}.`);
   }
   return data;
+}
+
+/** Live detail for a single collection (adds 7d/30d volume, sales, description). */
+export async function fetchNftDetail(slug: string, signal?: AbortSignal): Promise<NftCollection> {
+  const base = FN("nfts");
+  if (!base) throw new WatcherError("NFT feed isn't configured.");
+  const res = await fetch(`${base}?slug=${encodeURIComponent(slug)}`, {
+    signal,
+    headers: env.supabaseAnonKey
+      ? { apikey: env.supabaseAnonKey, authorization: `Bearer ${env.supabaseAnonKey}` }
+      : {},
+  });
+  const data = (await res.json().catch(() => ({}))) as { collection?: NftCollection; error?: string };
+  if (!res.ok || data.error || !data.collection) {
+    throw new WatcherError(data.error ?? `Detail returned ${res.status}.`);
+  }
+  return data.collection;
 }
 
 // ---- display helpers ----

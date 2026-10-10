@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Search, RefreshCw, Image as ImageIcon, ArrowDown, ArrowUp, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft, Search, RefreshCw, Image as ImageIcon, ArrowDown, ArrowUp,
+  ExternalLink, X, Lock, Sparkles, Loader2,
+} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   fetchTokens,
   fetchNfts,
+  fetchNftDetail,
   fmtUsd,
   fmtCompact,
   fmtUsdCompact,
@@ -505,12 +509,17 @@ function StatTile({ label, value, live, hint }: { label: string; value: string; 
 
 /* ---------------- nfts ---------------- */
 
+type NftSort = "floor" | "volume" | "owners";
+
 function NftsTab() {
   const [cols, setCols] = useState<NftCollection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [indexing, setIndexing] = useState(false);
   const [q, setQ] = useState("");
+  const [sort, setSort] = useState<NftSort>("floor");
+  const [open, setOpen] = useState<NftCollection | null>(null);
   const abort = useRef<AbortController | null>(null);
 
   async function load() {
@@ -522,6 +531,7 @@ function NftsTab() {
       const data = await fetchNfts(ac.signal);
       if (ac.signal.aborted) return;
       setCols(data.collections);
+      setIndexing(Boolean((data as { refreshing?: boolean }).refreshing) && data.collections.length === 0);
       setUpdatedAt(new Date());
       setError(null);
     } catch (e) {
@@ -541,13 +551,20 @@ function NftsTab() {
   const rows = useMemo(() => {
     if (!cols) return null;
     const needle = q.trim().toLowerCase();
-    return needle ? cols.filter((c) => c.name.toLowerCase().includes(needle) || c.slug.toLowerCase().includes(needle)) : cols;
-  }, [cols, q]);
+    const filtered = needle
+      ? cols.filter((c) => c.name.toLowerCase().includes(needle) || c.slug.toLowerCase().includes(needle))
+      : cols.slice();
+    const key = (c: NftCollection) =>
+      sort === "floor" ? c.floor ?? -1 : sort === "volume" ? c.oneDayVolume ?? -1 : c.owners ?? -1;
+    filtered.sort((a, b) => key(b) - key(a));
+    return filtered;
+  }, [cols, q, sort]);
 
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
+      {/* toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[180px] flex-1">
           <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
           <input
             value={q}
@@ -556,17 +573,28 @@ function NftsTab() {
             className="w-full rounded-lg border-2 border-ink bg-screen py-2 pl-9 pr-3 text-sm font-semibold outline-none placeholder:text-ink-soft focus:ring-2 focus:ring-pink"
           />
         </div>
+        <div className="tabs">
+          <button className="tab" data-active={sort === "floor"} onClick={() => setSort("floor")}>Floor</button>
+          <button className="tab" data-active={sort === "volume"} onClick={() => setSort("volume")}>24h vol</button>
+          <button className="tab" data-active={sort === "owners"} onClick={() => setSort("owners")}>Owners</button>
+        </div>
         <button onClick={load} disabled={refreshing} title="Refresh" className="btn btn-yellow h-10 px-3">
           <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
         </button>
       </div>
 
       <div className="mt-2 flex items-center justify-between text-xs text-ink-soft">
-        <span>{cols ? `${rows?.length ?? 0} collections on Robinhood Chain` : "Loading collections…"}</span>
+        <span>{cols ? `${rows?.length ?? 0} collections on Robinhood Chain · by ${sort === "volume" ? "24h volume" : sort}` : "Loading collections…"}</span>
         {updatedAt && <span>Updated {updatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
       </div>
 
       {error && !cols && <NftError message={error} onRetry={load} />}
+
+      {indexing && (
+        <div className="card-soft mt-3 flex items-center justify-center gap-2 p-6 text-sm text-ink-soft">
+          <Loader2 size={16} className="animate-spin" /> Indexing every Robinhood Chain collection, give it a moment then refresh.
+        </div>
+      )}
 
       {!cols && !error && (
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -576,33 +604,32 @@ function NftsTab() {
         </div>
       )}
 
-      {rows && (
-        rows.length === 0 ? (
-          <p className="py-10 text-center text-sm text-ink-soft">No collections match "{q}".</p>
-        ) : (
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            {rows.map((c) => (
-              <NftCard key={c.slug} c={c} />
-            ))}
-          </div>
-        )
+      {rows && rows.length > 0 && (
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {rows.map((c) => (
+            <NftCard key={c.slug} c={c} onOpen={() => setOpen(c)} />
+          ))}
+        </div>
+      )}
+      {rows && rows.length === 0 && !indexing && (
+        <p className="py-10 text-center text-sm text-ink-soft">No collections match "{q}".</p>
       )}
 
       <p className="mt-4 text-center text-[0.65rem] text-ink-soft">
         Collections and floors from OpenSea. NFTs are highly volatile, info only, not a quote to trade.
       </p>
+
+      {open && <NftDetailModal c={open} onClose={() => setOpen(null)} />}
     </div>
   );
 }
 
-function NftCard({ c }: { c: NftCollection }) {
+function NftCard({ c, onOpen }: { c: NftCollection; onOpen: () => void }) {
   const [broken, setBroken] = useState(false);
   return (
-    <a
-      href={c.url}
-      target="_blank"
-      rel="noreferrer noopener"
-      className="card-soft group flex flex-col overflow-hidden transition-transform hover:-translate-y-0.5"
+    <button
+      onClick={onOpen}
+      className="card-soft group flex flex-col overflow-hidden text-left transition-transform hover:-translate-y-0.5"
     >
       <div className="relative aspect-square w-full bg-screen-2">
         {c.image && !broken ? (
@@ -612,9 +639,6 @@ function NftCard({ c }: { c: NftCollection }) {
             <ImageIcon size={28} className="text-ink-soft" />
           </div>
         )}
-        <span className="absolute right-1.5 top-1.5 rounded bg-ink/80 p-1 text-screen opacity-0 transition-opacity group-hover:opacity-100">
-          <ExternalLink size={12} />
-        </span>
       </div>
       <div className="flex flex-1 flex-col p-2.5">
         <div className="display truncate text-sm leading-tight">{c.name}</div>
@@ -625,7 +649,7 @@ function NftCard({ c }: { c: NftCollection }) {
           <Stat label="Items" value={fmtInt(c.items)} />
         </div>
       </div>
-    </a>
+    </button>
   );
 }
 
@@ -634,6 +658,135 @@ function Stat({ label, value, strong }: { label: string; value: string; strong?:
     <div className="flex items-baseline justify-between gap-1">
       <span className="text-ink-soft">{label}</span>
       <span className={`tabular-nums ${strong ? "display" : "font-semibold"}`}>{value}</span>
+    </div>
+  );
+}
+
+function NftDetailModal({ c, onClose }: { c: NftCollection; onClose: () => void }) {
+  const [detail, setDetail] = useState<NftCollection>(c);
+  const [broken, setBroken] = useState(false);
+
+  useEffect(() => {
+    const ac = new AbortController();
+    fetchNftDetail(c.slug, ac.signal).then((d) => setDetail((prev) => ({ ...prev, ...d }))).catch(() => {});
+    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onEsc);
+    return () => { ac.abort(); window.removeEventListener("keydown", onEsc); };
+  }, [c.slug, onClose]);
+
+  const sym = detail.floorSymbol;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 backdrop-blur-sm sm:items-center sm:p-5" onClick={onClose}>
+      <div
+        className="card max-h-[92vh] w-full max-w-lg overflow-auto rounded-b-none sm:rounded-b-[var(--radius)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* header */}
+        <div className="sticky top-0 flex items-center justify-between gap-3 border-b-2 border-ink bg-screen px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="h-10 w-10 flex-none overflow-hidden rounded-lg border-2 border-ink bg-screen-2">
+              {detail.image && !broken ? (
+                <img src={detail.image} onError={() => setBroken(true)} className="h-full w-full object-cover" alt="" />
+              ) : (
+                <div className="grid h-full w-full place-items-center"><ImageIcon size={18} className="text-ink-soft" /></div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <div className="display truncate text-base leading-tight">{detail.name}</div>
+              <div className="pixel text-[0.6rem] text-ink-soft">ROBINHOOD CHAIN</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="btn h-9 w-9 flex-none p-0" aria-label="Close"><X size={16} /></button>
+        </div>
+
+        <div className="p-4">
+          {/* stat grid */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <Tile label="Floor" value={fmtNative(detail.floor, sym)} strong />
+            <Tile label="24h volume" value={fmtNative(detail.oneDayVolume, sym)} />
+            <Tile label="7d volume" value={fmtNative(detail.sevenDayVolume ?? null, sym)} />
+            <Tile label="Total volume" value={fmtNative(detail.totalVolume, sym)} />
+            <Tile label="Owners" value={fmtInt(detail.owners)} />
+            <Tile label="Items" value={fmtInt(detail.items)} />
+          </div>
+
+          {detail.description && (
+            <p className="mt-3 line-clamp-3 text-xs text-ink-soft">{detail.description}</p>
+          )}
+
+          <WatcherAnalysis />
+
+          <a
+            href={detail.url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="btn btn-pink mt-4 flex w-full items-center justify-center gap-2"
+          >
+            View on OpenSea <ExternalLink size={14} />
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Tile({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="card-soft px-3 py-2">
+      <div className="text-[0.58rem] uppercase tracking-wide text-ink-soft">{label}</div>
+      <div className={`mt-0.5 tabular-nums ${strong ? "display text-base" : "text-sm font-bold"}`}>{value}</div>
+    </div>
+  );
+}
+
+/** Interactive, honest coming-soon panel for the Watcher agent's buy analysis. */
+function WatcherAnalysis() {
+  const [open, setOpen] = useState(false);
+  const signals = [
+    "Liquidity depth vs floor",
+    "Floor trend (24h / 7d)",
+    "Holder concentration",
+    "Volume / floor ratio",
+    "Wash-trading risk",
+  ];
+  return (
+    <div className="mt-4 rounded-[var(--radius)] border-2 border-ink bg-screen-2 p-3">
+      <button onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between gap-2">
+        <span className="flex items-center gap-2">
+          <Sparkles size={15} className="text-pink" />
+          <span className="display text-sm">Watcher analysis</span>
+          <Badge variant="yellow">Coming soon</Badge>
+        </span>
+        <span className="pixel text-[0.6rem] text-ink-soft">{open ? "HIDE" : "PREVIEW"}</span>
+      </button>
+
+      {open && (
+        <div className="mt-3">
+          <p className="text-xs text-ink-soft">
+            The Watcher agent will score each collection and call whether it looks like a good entry.
+            Here is what it will weigh:
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {signals.map((s) => (
+              <li key={s} className="flex items-center justify-between rounded-lg border border-line bg-screen px-2.5 py-1.5 text-xs">
+                <span>{s}</span>
+                <span className="flex items-center gap-1 text-ink-soft"><Lock size={11} /> locked</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3 flex items-center justify-between rounded-lg border-2 border-dashed border-ink/40 px-3 py-2">
+            <span className="text-xs text-ink-soft">Verdict</span>
+            <span className="display text-sm text-ink-soft">Awaiting agent</span>
+          </div>
+          <button
+            disabled
+            className="btn mt-3 w-full cursor-not-allowed opacity-50"
+            title="Coming soon"
+          >
+            Ask the Watcher
+          </button>
+        </div>
+      )}
     </div>
   );
 }

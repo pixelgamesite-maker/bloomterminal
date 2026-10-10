@@ -1,23 +1,29 @@
 // Supabase Edge Function: nfts
 // ----------------------------
-// NFT collections on Robinhood Chain, from OpenSea's API v2 (which indexes
-// the chain). Lists the chain's collections, pulls floor / volume / owners
-// for each, and returns a normalized list the Watcher renders as cards.
+// NFT collections on Robinhood Chain, from OpenSea's API v2.
 //
-// Needs a free OpenSea API key (https://docs.opensea.io, request an API key):
-//   supabase secrets set OPENSEA_API_KEY=xxxxxxxx
+// The chain has more collections than we can stat on every page load (OpenSea
+// gives floor/volume only per-collection), so this function keeps a Supabase
+// table (nft_collections) warm in the background: a list request reads the
+// WHOLE table instantly (sorted by floor), and triggers a refresh when the
+// data is stale. ?slug=<slug> returns one collection's live detail.
 //
-// Deploy (public reads):  supabase functions deploy nfts --no-verify-jwt
+// Needs a free OpenSea key:  supabase secrets set OPENSEA_API_KEY=xxxx
+// Needs the table:           run supabase/nft_collections.sql once.
+// Deploy (public reads):     supabase functions deploy nfts --no-verify-jwt
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
 const OS = "https://api.opensea.io/api/v2";
 const KEY = Deno.env.get("OPENSEA_API_KEY") ?? "";
 const CHAIN_OVERRIDE = Deno.env.get("OPENSEA_CHAIN") ?? "";
-// A known Robinhood Chain collection, used to discover the chain slug.
 const SEED_SLUG = Deno.env.get("OPENSEA_SEED") || "robindoodnft";
-const TTL = 5 * 60 * 1000;
-const CHAIN_TTL = 60 * 60 * 1000;
-const MAX_COLLECTIONS = 48; // cap stats lookups
-const STATS_CONCURRENCY = 6;
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+
+const FRESH_TTL = 15 * 60 * 1000; // refresh the table at most this often
+const MAX_PAGES = 40; // collections pages (100 each) = safety cap
+const STATS_CONCURRENCY = 8;
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -25,6 +31,7 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-client-info",
 };
 const osHeaders = () => ({ accept: "application/json", "x-api-key": KEY });
+const sb = SUPABASE_URL && SERVICE_KEY ? createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } }) : null;
 
 interface NftCollection {
   slug: string;
@@ -37,20 +44,22 @@ interface NftCollection {
   owners: number | null;
   items: number | null;
   url: string;
+  // detail-only extras
+  sevenDayVolume?: number | null;
+  thirtyDayVolume?: number | null;
+  sales?: number | null;
+  description?: string | null;
 }
-
-let chainCache: { slug: string; at: number } | null = null;
-let listCache: { at: number; data: NftCollection[] } | null = null;
 
 function num(v: unknown): number | null {
   const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
   return Number.isFinite(n) ? n : null;
 }
 
-/** Discover OpenSea's chain slug for Robinhood Chain from a seed collection. */
+let chainCache: { slug: string; at: number } | null = null;
 async function resolveChain(): Promise<string> {
   if (CHAIN_OVERRIDE) return CHAIN_OVERRIDE;
-  if (chainCache && Date.now() - chainCache.at < CHAIN_TTL) return chainCache.slug;
+  if (chainCache && Date.now() - chainCache.at < 60 * 60 * 1000) return chainCache.slug;
   try {
     const r = await fetch(`${OS}/collections/${SEED_SLUG}`, { headers: osHeaders() });
     if (r.ok) {
@@ -62,20 +71,15 @@ async function resolveChain(): Promise<string> {
       }
     }
   } catch { /* fall through */ }
-  return "robinhood"; // best-effort fallback
+  return "robinhood";
 }
 
-interface OsCollection {
-  collection: string; // slug
-  name?: string;
-  image_url?: string;
-  total_supply?: number;
-}
+interface OsCollection { collection: string; name?: string; image_url?: string; total_supply?: number; description?: string }
 
-async function listCollections(chain: string): Promise<OsCollection[]> {
+async function listAllCollections(chain: string): Promise<OsCollection[]> {
   const out: OsCollection[] = [];
   let next = "";
-  for (let i = 0; i < 3 && out.length < MAX_COLLECTIONS; i++) {
+  for (let i = 0; i < MAX_PAGES; i++) {
     const url = `${OS}/collections?chain=${encodeURIComponent(chain)}&limit=100${next ? `&next=${next}` : ""}`;
     const r = await fetch(url, { headers: osHeaders() });
     if (!r.ok) break;
@@ -83,56 +87,84 @@ async function listCollections(chain: string): Promise<OsCollection[]> {
     const rows: OsCollection[] = j?.collections ?? [];
     out.push(...rows);
     next = j?.next ?? "";
-    if (!next) break;
+    if (!next || !rows.length) break;
   }
-  return out.slice(0, MAX_COLLECTIONS);
+  return out;
 }
 
-async function fetchStats(c: OsCollection): Promise<NftCollection | null> {
+async function statsFor(c: OsCollection): Promise<NftCollection | null> {
   try {
     const r = await fetch(`${OS}/collections/${c.collection}/stats`, { headers: osHeaders() });
     const s = r.ok ? await r.json() : null;
     const total = s?.total ?? {};
-    const oneDay = (s?.intervals ?? []).find((x: { interval?: string }) => x.interval === "one_day");
+    const intervals: { interval?: string; volume?: number }[] = s?.intervals ?? [];
+    const byInt = (k: string) => num(intervals.find((x) => x.interval === k)?.volume);
     return {
       slug: c.collection,
       name: c.name ?? c.collection,
       image: c.image_url ?? null,
       floor: num(total.floor_price),
       floorSymbol: typeof total.floor_price_symbol === "string" ? total.floor_price_symbol : null,
-      oneDayVolume: num(oneDay?.volume),
+      oneDayVolume: byInt("one_day"),
       totalVolume: num(total.volume),
       owners: num(total.num_owners),
       items: num(c.total_supply),
       url: `https://opensea.io/collection/${c.collection}`,
+      sevenDayVolume: byInt("seven_day"),
+      thirtyDayVolume: byInt("thirty_day"),
+      sales: num(total.sales),
+      description: typeof c.description === "string" ? c.description : null,
     };
   } catch {
     return null;
   }
 }
 
-async function getCollections(): Promise<NftCollection[]> {
-  if (listCache && Date.now() - listCache.at < TTL) return listCache.data;
-  const chain = await resolveChain();
-  const base = await listCollections(chain);
-
-  const stats: NftCollection[] = [];
-  for (let i = 0; i < base.length; i += STATS_CONCURRENCY) {
-    const chunk = base.slice(i, i + STATS_CONCURRENCY);
-    const res = await Promise.all(chunk.map(fetchStats));
-    for (const r of res) if (r) stats.push(r);
+async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+  const out: R[] = [];
+  for (let i = 0; i < items.length; i += limit) {
+    const res = await Promise.all(items.slice(i, i + limit).map(fn));
+    out.push(...res);
   }
+  return out;
+}
 
-  // Rank by recent activity, then all-time, then owners, so live collections surface.
-  stats.sort(
-    (a, b) =>
-      (b.oneDayVolume ?? 0) - (a.oneDayVolume ?? 0) ||
-      (b.totalVolume ?? 0) - (a.totalVolume ?? 0) ||
-      (b.owners ?? 0) - (a.owners ?? 0)
-  );
+/** Full refresh: pull every collection + stats, upsert into the table. */
+async function refreshAll(): Promise<void> {
+  if (!sb) return;
+  const chain = await resolveChain();
+  const base = await listAllCollections(chain);
+  const stats = (await mapLimit(base, STATS_CONCURRENCY, statsFor)).filter((x): x is NftCollection => !!x);
+  if (!stats.length) return;
+  const now = new Date().toISOString();
+  const rows = stats.map((c) => ({
+    slug: c.slug, name: c.name, image: c.image, floor: c.floor, floor_symbol: c.floorSymbol,
+    one_day_volume: c.oneDayVolume, total_volume: c.totalVolume, owners: c.owners, items: c.items, updated_at: now,
+  }));
+  // upsert in chunks to stay under payload limits
+  for (let i = 0; i < rows.length; i += 200) {
+    await sb.from("nft_collections").upsert(rows.slice(i, i + 200), { onConflict: "slug" });
+  }
+}
 
-  listCache = { at: Date.now(), data: stats };
-  return stats;
+type Row = {
+  slug: string; name: string | null; image: string | null; floor: number | null; floor_symbol: string | null;
+  one_day_volume: number | null; total_volume: number | null; owners: number | null; items: number | null; updated_at: string;
+};
+
+function rowToCollection(r: Row): NftCollection {
+  return {
+    slug: r.slug, name: r.name ?? r.slug, image: r.image, floor: r.floor, floorSymbol: r.floor_symbol,
+    oneDayVolume: r.one_day_volume, totalVolume: r.total_volume, owners: r.owners, items: r.items,
+    url: `https://opensea.io/collection/${r.slug}`,
+  };
+}
+
+function background(p: Promise<unknown>) {
+  // Keep the instance alive to finish the refresh after responding.
+  const er = (globalThis as unknown as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+  if (er?.waitUntil) er.waitUntil(p);
+  else p.catch(() => {});
 }
 
 Deno.serve(async (req: Request) => {
@@ -140,19 +172,70 @@ Deno.serve(async (req: Request) => {
   const json = (body: unknown, status = 200) =>
     new Response(JSON.stringify(body), {
       status,
-      headers: { ...cors, "content-type": "application/json", "cache-control": "public, max-age=120" },
+      headers: { ...cors, "content-type": "application/json", "cache-control": "public, max-age=60" },
     });
 
   if (!KEY) {
     return json({ error: "NFT feed needs an OpenSea API key. Set OPENSEA_API_KEY in Supabase secrets." }, 503);
   }
-  try {
-    const collections = await getCollections();
-    return json({ collections, count: collections.length, generatedAt: new Date().toISOString() });
-  } catch (err) {
-    if (listCache) {
-      return json({ collections: listCache.data, count: listCache.data.length, generatedAt: new Date(listCache.at).toISOString(), stale: true });
+
+  const url = new URL(req.url);
+  const slug = url.searchParams.get("slug");
+
+  // ---- detail: live single collection ----
+  if (slug) {
+    try {
+      const rc = await fetch(`${OS}/collections/${slug}`, { headers: osHeaders() });
+      const col = rc.ok ? await rc.json() : null;
+      const detail = await statsFor({
+        collection: slug,
+        name: col?.name,
+        image_url: col?.image_url,
+        total_supply: col?.total_supply,
+        description: col?.description,
+      });
+      if (!detail) return json({ error: "collection not found" }, 404);
+      return json({ collection: detail, generatedAt: new Date().toISOString() });
+    } catch (err) {
+      return json({ error: "detail unavailable", detail: String(err) }, 502);
     }
+  }
+
+  // ---- list: whole table, sorted by floor ----
+  try {
+    if (!sb) {
+      // No DB configured: fall back to a live top slice so the tab still works.
+      const chain = await resolveChain();
+      const base = (await listAllCollections(chain)).slice(0, 50);
+      const live = (await mapLimit(base, STATS_CONCURRENCY, statsFor)).filter((x): x is NftCollection => !!x);
+      live.sort((a, b) => (b.floor ?? -1) - (a.floor ?? -1));
+      return json({ collections: live, count: live.length, generatedAt: new Date().toISOString(), source: "live" });
+    }
+
+    const { data, error } = await sb
+      .from("nft_collections")
+      .select("*")
+      .order("floor", { ascending: false, nullsFirst: false })
+      .limit(2000);
+    if (error) throw error;
+
+    const rows = (data as Row[]) ?? [];
+    const collections = rows.map(rowToCollection);
+    const newest = rows.reduce((m, r) => Math.max(m, Date.parse(r.updated_at)), 0);
+    const stale = !rows.length || Date.now() - newest > FRESH_TTL;
+
+    if (!rows.length) {
+      // Cold start: fill now so the first visitor sees data.
+      await refreshAll();
+      const { data: d2 } = await sb
+        .from("nft_collections").select("*").order("floor", { ascending: false, nullsFirst: false }).limit(2000);
+      const c2 = ((d2 as Row[]) ?? []).map(rowToCollection);
+      return json({ collections: c2, count: c2.length, generatedAt: new Date().toISOString(), source: "fresh" });
+    }
+
+    if (stale) background(refreshAll());
+    return json({ collections, count: collections.length, generatedAt: new Date(newest).toISOString(), refreshing: stale });
+  } catch (err) {
     return json({ error: "nft feed unavailable", detail: String(err) }, 502);
   }
 });
