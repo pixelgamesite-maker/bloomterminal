@@ -4,7 +4,7 @@ import { getRef, clearRef } from "./referral";
 
 /*
  * Supabase client. Null until VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY are
- * set in .env.local — the app then uses real X OAuth. PKCE flow + session
+ * set in .env.local, the app then uses real X OAuth. PKCE flow + session
  * detection in the URL handles the OAuth redirect back from X automatically.
  */
 export const supabase: SupabaseClient | null = isBackendConfigured
@@ -47,7 +47,7 @@ export interface InviteRow {
 /**
  * On first sign-in through a referral link, attribute it: resolve the
  * inviter's id from their handle and insert a row into `referrals`.
- * Safe to call on every sign-in — it no-ops if already attributed.
+ * Safe to call on every sign-in, it no-ops if already attributed.
  */
 export async function attributeReferral(userId: string, myHandle: string | null) {
   if (!supabase) return;

@@ -2,7 +2,7 @@
 // ---------------------------------
 // Public proxy for Robinhood Chain's tokenized-stock feed. The browser can't
 // call api.robinhood.com directly (CORS), so the Watcher page calls this
-// instead. No API key is needed for this feed — it's a plain read-through
+// instead. No API key is needed for this feed, it's a plain read-through
 // proxy with a short in-memory cache so we don't hammer the upstream.
 //
 // Endpoints (GET):
@@ -10,7 +10,7 @@
 //   /rh-tokens?symbol=NVDA → a single token + quote (used for detail/refresh)
 //
 // Deploy:  supabase functions deploy rh-tokens --no-verify-jwt
-//   (--no-verify-jwt keeps the Watcher public — anyone can read prices.)
+//   (--no-verify-jwt keeps the Watcher public, anyone can read prices.)
 
 const RH_BASE = "https://api.robinhood.com/rhj";
 const ASSETS_TTL = 5 * 60 * 1000; // asset list barely changes

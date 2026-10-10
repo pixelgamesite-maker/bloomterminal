@@ -1,12 +1,11 @@
 @import "tailwindcss";
 
 /*
-  Bloom Terminal — cozy retro-CRT. The whole site reads like it's on an old
-  TV screen: soft cream glow, faint scanlines, a dark vignette at the edges.
-  Playful pastel accents pulled from the pixel-TV art.
+  Bloom Terminal, cozy retro screen. Soft cream glow, playful pastel accents
+  pulled from the pixel-TV art, now full-bleed across the whole window.
 */
 @theme inline {
-  --color-screen: #ece5d6;     /* the lit screen — page background */
+  --color-screen: #ece5d6;     /* the lit screen, page background */
   --color-screen-2: #e3dbc8;  /* slightly darker inset */
   --color-room: #16131c;       /* the dark tube around the screen */
   --color-ink: #2e2a3a;        /* soft near-black text */
@@ -42,9 +41,13 @@ html {
   color-scheme: light;
 }
 
+html, body, #root {
+  min-height: 100%;
+}
+
 body {
   margin: 0;
-  background: var(--color-room);
+  background: var(--color-screen);
   color: var(--color-ink);
   font-family: var(--font-body);
   font-size: 16px;

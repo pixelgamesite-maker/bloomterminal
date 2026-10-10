@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Search, RefreshCw, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Search, RefreshCw, Image as ImageIcon, ArrowDown, ArrowUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   fetchTokens,
   fmtUsd,
   fmtCompact,
   spreadPct,
+  rangePos,
   WatcherError,
   type Token,
 } from "@/lib/watcher";
@@ -17,78 +17,38 @@ const REFRESH_MS = 20_000;
 
 export default function Watcher() {
   const [tab, setTab] = useState<Tab>("tokens");
-
+  const feed = useFeed();
   return (
-    <div className="mx-auto max-w-3xl px-5 py-5">
-      {/* header */}
-      <div className="flex items-center justify-between">
-        <Link
-          to="/"
-          className="flex items-center gap-1.5 rounded-lg border-2 border-ink bg-screen px-3 py-1.5 text-sm font-bold hover:bg-ink hover:text-screen"
-        >
-          <ArrowLeft size={15} /> Home
-        </Link>
+    <div className="min-h-screen">
+      <TopBar />
+      <TickerTape tokens={feed.tokens} />
+      <div className="mx-auto max-w-6xl px-4 py-5">
         <div className="flex items-center gap-2">
-          <img src="/robinhood-watcher.png" className="pixel h-8 w-auto" alt="" />
-          <span className="pixel text-xs">WATCHER</span>
+          <button className="tab" data-active={tab === "tokens"} onClick={() => setTab("tokens")}>
+            Tokens
+          </button>
+          <button className="tab" data-active={tab === "nfts"} onClick={() => setTab("nfts")}>
+            NFTs
+          </button>
         </div>
+        <div className="mt-4">{tab === "tokens" ? <TokensTab feed={feed} /> : <NftsTab />}</div>
       </div>
-
-      <div className="boot mt-5">
-        <h1 className="display text-2xl sm:text-3xl">Watcher</h1>
-        <p className="mt-1 max-w-lg text-sm text-ink-soft">
-          Live tokenized stocks on Robinhood Chain, and the Bloom NFT collection.
-          Public — no sign-in needed.
-        </p>
-      </div>
-
-      {/* tabs */}
-      <div className="mt-5 flex gap-2">
-        <TabButton active={tab === "tokens"} onClick={() => setTab("tokens")}>
-          Tokens
-        </TabButton>
-        <TabButton active={tab === "nfts"} onClick={() => setTab("nfts")}>
-          NFTs
-        </TabButton>
-      </div>
-
-      <div className="mt-4">{tab === "tokens" ? <TokensTab /> : <NftsTab />}</div>
     </div>
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={
-        "display rounded-lg border-2 border-ink px-4 py-1.5 text-sm transition-transform " +
-        (active
-          ? "bg-ink text-screen"
-          : "bg-screen hover:-translate-y-0.5 hover:bg-screen-2")
-      }
-    >
-      {children}
-    </button>
-  );
-}
+type Feed = ReturnType<typeof useFeed>;
 
-/* ---------------- Tokens ---------------- */
+/* ---------------- shared live feed ---------------- */
 
-function TokensTab() {
+function useFeed() {
   const [tokens, setTokens] = useState<Token[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [q, setQ] = useState("");
+  const [tick, setTick] = useState(0);
+  const prevMids = useRef<Map<string, number>>(new Map());
+  const dir = useRef<Map<string, "up" | "down">>(new Map());
   const abort = useRef<AbortController | null>(null);
 
   async function load() {
@@ -99,9 +59,19 @@ function TokensTab() {
     try {
       const data = await fetchTokens(ac.signal);
       if (ac.signal.aborted) return;
+      const d = new Map<string, "up" | "down">();
+      for (const t of data.tokens) {
+        const prev = prevMids.current.get(t.symbol);
+        if (prev != null && t.mid != null && t.mid !== prev) {
+          d.set(t.symbol, t.mid > prev ? "up" : "down");
+        }
+        if (t.mid != null) prevMids.current.set(t.symbol, t.mid);
+      }
+      dir.current = d;
       setTokens(data.tokens);
       setUpdatedAt(new Date());
       setError(null);
+      setTick((n) => n + 1);
     } catch (e) {
       if (ac.signal.aborted) return;
       setError(e instanceof WatcherError ? e.message : "Couldn't reach the price feed.");
@@ -120,54 +90,147 @@ function TokensTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const filtered = useMemo(() => {
+  return { tokens, error, updatedAt, refreshing, tick, dir: dir.current, reload: load };
+}
+
+/* ---------------- top bar ---------------- */
+
+function TopBar() {
+  return (
+    <div className="sticky top-0 z-30 border-b-2 border-ink bg-screen/95 backdrop-blur">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
+        <div className="flex items-center gap-3">
+          <Link
+            to="/"
+            className="flex items-center gap-1.5 rounded-lg border-2 border-ink bg-screen px-2.5 py-1 text-xs font-bold hover:bg-ink hover:text-screen"
+          >
+            <ArrowLeft size={14} /> Home
+          </Link>
+          <span className="pixel text-xs">
+            BLOOM<span className="text-ink-soft"> // WATCHER</span>
+            <span className="blink text-pink">_</span>
+          </span>
+        </div>
+        <div className="flex items-center gap-2 text-[0.65rem] text-ink-soft">
+          <span className="dot dot-live" />
+          <span className="pixel">ROBINHOOD CHAIN · 4663</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- ticker ---------------- */
+
+function TickerTape({ tokens }: { tokens: Token[] | null }) {
+  if (!tokens || tokens.length === 0) {
+    return <div className="ticker"><div className="ticker-track pixel text-[0.6rem]">LIVE MARKET FEED · ROBINHOOD CHAIN · LOADING…</div></div>;
+  }
+  const line = tokens.slice(0, 40);
+  const Item = ({ t }: { t: Token }) => (
+    <span className="pixel text-[0.62rem]">
+      {t.symbol} <span className="tnum">{fmtUsd(t.mid)}</span>
+    </span>
+  );
+  return (
+    <div className="ticker">
+      <div className="ticker-track">
+        {line.map((t) => (
+          <Item key={`a-${t.symbol}`} t={t} />
+        ))}
+        {line.map((t) => (
+          <Item key={`b-${t.symbol}`} t={t} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- tokens ---------------- */
+
+type SortKey = "symbol" | "mid" | "bid" | "ask" | "spread" | "volume" | "range";
+type SortDir = "asc" | "desc";
+
+function TokensTab({ feed }: { feed: Feed }) {
+  const { tokens, error, updatedAt, refreshing, tick, dir, reload } = feed;
+  const [q, setQ] = useState("");
+  const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "volume", dir: "desc" });
+
+  function toggleSort(key: SortKey) {
+    setSort((s) =>
+      s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: key === "symbol" ? "asc" : "desc" }
+    );
+  }
+
+  const rows = useMemo(() => {
     if (!tokens) return null;
     const needle = q.trim().toLowerCase();
-    if (!needle) return tokens;
-    return tokens.filter(
-      (t) =>
-        t.symbol.toLowerCase().includes(needle) || t.name.toLowerCase().includes(needle)
-    );
-  }, [tokens, q]);
+    const filtered = needle
+      ? tokens.filter((t) => t.symbol.toLowerCase().includes(needle) || t.name.toLowerCase().includes(needle))
+      : tokens.slice();
+
+    const val = (t: Token): number | string => {
+      switch (sort.key) {
+        case "symbol": return t.symbol;
+        case "mid": return t.mid ?? -1;
+        case "bid": return t.bid ?? -1;
+        case "ask": return t.ask ?? -1;
+        case "spread": return spreadPct(t) ?? 1e9;
+        case "range": return rangePos(t) ?? -1;
+        case "volume": return t.volume ?? -1;
+      }
+    };
+    filtered.sort((a, b) => {
+      const av = val(a), bv = val(b);
+      let c: number;
+      if (typeof av === "string" && typeof bv === "string") c = av.localeCompare(bv);
+      else c = (av as number) - (bv as number);
+      return sort.dir === "asc" ? c : -c;
+    });
+    return filtered;
+  }, [tokens, q, sort]);
+
+  const stats = useMemo(() => {
+    if (!tokens) return null;
+    const spreads = tokens.map((t) => spreadPct(t)).filter((s): s is number => s != null);
+    const avgSpread = spreads.length ? spreads.reduce((a, b) => a + b, 0) / spreads.length : null;
+    const halted = tokens.filter((t) => t.halted).length;
+    return { markets: tokens.length, avgSpread, halted };
+  }, [tokens]);
 
   return (
     <div>
-      {/* controls */}
-      <div className="flex items-center gap-2">
+      {/* stat strip */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <StatTile label="Markets" value={stats ? String(stats.markets) : "-"} />
+        <StatTile label="Avg spread" value={stats?.avgSpread != null ? `${stats.avgSpread.toFixed(2)}%` : "-"} />
+        <StatTile label="Halted" value={stats ? String(stats.halted) : "-"} />
+        <StatTile
+          label="Updated"
+          value={updatedAt ? updatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "-"}
+          live
+        />
+      </div>
+
+      {/* toolbar */}
+      <div className="mt-3 flex items-center gap-2">
         <div className="relative flex-1">
-          <Search
-            size={15}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft"
-          />
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search symbol or name…"
+            placeholder="Search ticker or company…"
             className="w-full rounded-lg border-2 border-ink bg-screen py-2 pl-9 pr-3 text-sm font-semibold outline-none placeholder:text-ink-soft focus:ring-2 focus:ring-pink"
           />
         </div>
-        <Button
-          variant="yellow"
-          size="sm"
-          onClick={load}
+        <button
+          onClick={reload}
           disabled={refreshing}
-          aria-label="Refresh"
           title="Refresh"
+          className="btn btn-yellow h-10 px-3"
         >
           <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
-        </Button>
-      </div>
-
-      {/* status line */}
-      <div className="mt-2 flex items-center justify-between text-xs text-ink-soft">
-        <span>
-          {tokens ? `${filtered?.length ?? 0} of ${tokens.length} tokens` : "Loading feed…"}
-        </span>
-        {updatedAt && (
-          <span>
-            Updated {updatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
-          </span>
-        )}
+        </button>
       </div>
 
       {/* body */}
@@ -175,61 +238,118 @@ function TokensTab() {
         <div className="card-soft mt-3 p-6 text-center">
           <p className="display text-sm">The feed is quiet</p>
           <p className="mt-1 text-xs text-ink-soft">{error}</p>
-          <Button variant="pink" size="sm" className="mt-3" onClick={load}>
-            Try again
-          </Button>
+          <button className="btn btn-pink mt-3 h-9 px-3 text-xs" onClick={reload}>Try again</button>
         </div>
       )}
 
       {!tokens && !error && (
-        <div className="mt-3 space-y-2">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="card-soft h-[62px] animate-pulse opacity-60" />
+        <div className="mt-3 space-y-1.5">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="card-soft h-10 animate-pulse opacity-60" />
           ))}
         </div>
       )}
 
-      {filtered && (
-        <div className="mt-3 space-y-2">
-          {filtered.length === 0 ? (
-            <p className="py-8 text-center text-sm text-ink-soft">No tokens match "{q}".</p>
-          ) : (
-            filtered.map((t) => <TokenRow key={t.symbol} t={t} />)
-          )}
+      {rows && (
+        <div className="card mt-3 overflow-hidden">
+          <div className="max-h-[70vh] overflow-auto">
+            <table className="dex">
+              <thead>
+                <tr>
+                  <th className="left" style={{ width: 40 }}>#</th>
+                  <SortTh label="Market" k="symbol" sort={sort} onSort={toggleSort} align="left" />
+                  <SortTh label="Price" k="mid" sort={sort} onSort={toggleSort} />
+                  <SortTh label="Bid" k="bid" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortTh label="Ask" k="ask" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortTh label="Spread" k="spread" sort={sort} onSort={toggleSort} />
+                  <th className="hidden lg:table-cell" style={{ width: 150 }}>Day range</th>
+                  <SortTh label="Vol" k="volume" sort={sort} onSort={toggleSort} className="hidden sm:table-cell" />
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="left py-8 text-center text-sm text-ink-soft">
+                      No markets match "{q}".
+                    </td>
+                  </tr>
+                ) : (
+                  rows.map((t, i) => (
+                    <Row key={t.symbol} t={t} rank={i + 1} flash={dir.get(t.symbol)} tick={tick} />
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      <p className="mt-4 text-center text-[0.65rem] text-ink-soft">
-        Prices from Robinhood Chain · for information only, not a quote to trade.
+      <p className="mt-3 text-center text-[0.65rem] text-ink-soft">
+        Prices from Robinhood Chain, for information only, not a quote to trade.
       </p>
     </div>
   );
 }
 
-function TokenRow({ t }: { t: Token }) {
+function SortTh({
+  label,
+  k,
+  sort,
+  onSort,
+  align = "right",
+  className = "",
+}: {
+  label: string;
+  k: SortKey;
+  sort: { key: SortKey; dir: SortDir };
+  onSort: (k: SortKey) => void;
+  align?: "left" | "right";
+  className?: string;
+}) {
+  const active = sort.key === k;
+  return (
+    <th className={`${align === "left" ? "left" : ""} ${className}`} onClick={() => onSort(k)}>
+      <span className={`inline-flex items-center gap-1 ${align === "right" ? "flex-row-reverse" : ""}`}>
+        {label}
+        {active && (sort.dir === "asc" ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
+      </span>
+    </th>
+  );
+}
+
+function Row({ t, rank, flash, tick }: { t: Token; rank: number; flash?: "up" | "down"; tick: number }) {
   const spread = spreadPct(t);
   return (
-    <div className="card-soft flex items-center gap-3 p-3">
-      <Logo t={t} />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="display text-sm">{t.symbol}</span>
-          {t.halted && <Badge variant="down">halted</Badge>}
+    <tr>
+      <td className="left mono text-[0.7rem] text-ink-soft">{rank}</td>
+      <td className="left">
+        <div className="flex items-center gap-2.5">
+          <Logo t={t} />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="display text-sm leading-none">{t.symbol}</span>
+              {t.halted && <Badge variant="down">halt</Badge>}
+            </div>
+            <div className="truncate text-[0.68rem] leading-tight text-ink-soft" style={{ maxWidth: 180 }}>
+              {t.name}
+            </div>
+          </div>
         </div>
-        <p className="truncate text-xs text-ink-soft">{t.name}</p>
-      </div>
-
-      <div className="hidden w-32 flex-none sm:block">
+      </td>
+      <td className="num">
+        {/* key on tick+flash so the flash animation re-fires each update */}
+        <span key={`${tick}`} className={`display text-sm ${flash === "up" ? "flash-up" : flash === "down" ? "flash-down" : ""} inline-block rounded px-1`}>
+          {fmtUsd(t.mid)}
+        </span>
+      </td>
+      <td className="num hidden text-ink-soft md:table-cell">{fmtUsd(t.bid)}</td>
+      <td className="num hidden text-ink-soft md:table-cell">{fmtUsd(t.ask)}</td>
+      <td className="num">{spread != null ? `${spread.toFixed(2)}%` : "-"}</td>
+      <td className="hidden lg:table-cell">
         <DayRange t={t} />
-      </div>
-
-      <div className="w-24 flex-none text-right">
-        <div className="display text-sm">{fmtUsd(t.mid)}</div>
-        <div className="text-[0.65rem] text-ink-soft">
-          {spread != null ? `${spread.toFixed(2)}% spr` : t.volume != null ? `vol ${fmtCompact(t.volume)}` : "—"}
-        </div>
-      </div>
-    </div>
+      </td>
+      <td className="num hidden text-ink-soft sm:table-cell">{fmtCompact(t.volume)}</td>
+    </tr>
   );
 }
 
@@ -240,33 +360,30 @@ function Logo({ t }: { t: Token }) {
       <img
         src={t.logoUrl}
         onError={() => setBroken(true)}
-        className="h-9 w-9 flex-none rounded-full border-2 border-ink bg-screen object-contain"
+        className="h-7 w-7 flex-none rounded-full border-2 border-ink bg-screen object-contain"
         alt=""
       />
     );
   }
   return (
-    <div className="grid h-9 w-9 flex-none place-items-center rounded-full border-2 border-ink bg-screen-2 pixel text-[0.6rem]">
+    <div className="grid h-7 w-7 flex-none place-items-center rounded-full border-2 border-ink bg-screen-2 pixel text-[0.52rem]">
       {t.symbol.slice(0, 2)}
     </div>
   );
 }
 
-/** A little bar showing where the mid sits between the day's low and high. */
 function DayRange({ t }: { t: Token }) {
-  if (t.dailyLow == null || t.dailyHigh == null || t.mid == null || t.dailyHigh <= t.dailyLow) {
-    return <div className="text-right text-[0.65rem] text-ink-soft">no range</div>;
-  }
-  const pct = Math.max(0, Math.min(1, (t.mid - t.dailyLow) / (t.dailyHigh - t.dailyLow)));
+  const pos = rangePos(t);
+  if (pos == null) return <span className="text-[0.65rem] text-ink-soft">no range</span>;
   return (
-    <div>
+    <div className="w-[140px]">
       <div className="relative h-1.5 w-full rounded-full bg-screen-2">
         <div
           className="absolute top-1/2 h-3 w-1 -translate-y-1/2 rounded-full bg-ink"
-          style={{ left: `calc(${pct * 100}% - 2px)` }}
+          style={{ left: `calc(${pos * 100}% - 2px)` }}
         />
       </div>
-      <div className="mt-1 flex justify-between text-[0.6rem] text-ink-soft">
+      <div className="mt-1 flex justify-between text-[0.58rem] tabular-nums text-ink-soft">
         <span>{fmtUsd(t.dailyLow)}</span>
         <span>{fmtUsd(t.dailyHigh)}</span>
       </div>
@@ -274,7 +391,19 @@ function DayRange({ t }: { t: Token }) {
   );
 }
 
-/* ---------------- NFTs ---------------- */
+function StatTile({ label, value, live }: { label: string; value: string; live?: boolean }) {
+  return (
+    <div className="card-soft px-3 py-2">
+      <div className="flex items-center gap-1.5 text-[0.6rem] uppercase tracking-wide text-ink-soft">
+        {live && <span className="dot dot-live" style={{ width: 7, height: 7 }} />}
+        {label}
+      </div>
+      <div className="display mt-0.5 text-base tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+/* ---------------- nfts ---------------- */
 
 function NftsTab() {
   return (
@@ -287,8 +416,8 @@ function NftsTab() {
         <Badge variant="yellow">Coming soon</Badge>
       </div>
       <p className="mt-2 max-w-sm text-sm text-ink-soft">
-        Floor prices, holders and the Bloom collection — wiring up to OpenSea next.
-        Tokens are live now; check the Tokens tab.
+        Floor prices, holders and the Bloom collection, wiring up to OpenSea next.
+        Tokens are live now, check the Tokens tab.
       </p>
     </div>
   );

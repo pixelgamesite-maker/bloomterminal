@@ -1,4 +1,4 @@
-// Tiny deterministic chart helpers — no deps, good enough for demo visuals.
+// Tiny deterministic chart helpers, no deps, good enough for demo visuals.
 
 /** Seeded random walk in the 5..95 range. */
 export function series(n: number, seed = 1, vol = 1): number[] {

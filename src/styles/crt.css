@@ -1,88 +1,13 @@
 /*
-  CRT furniture: the screen frame, scanlines, vignette, pixel controls
-  and soft cards. Kept subtle — the dark edges should feel present, not loud.
+  Screen furniture: full-bleed shell, pixel controls, soft cards and the
+  dense terminal table. No dark TV trim, the screen fills the whole window.
 */
 
-/* ---- The TV ------------------------------------------------------------ */
-.crt-room {
-  position: fixed;
-  inset: 0;
-  background:
-    radial-gradient(130% 120% at 50% 0%, #241f2e 0%, var(--color-room) 60%);
-  padding: clamp(8px, 2.2vw, 26px);
-}
-
-.crt-screen {
-  position: relative;
-  height: 100%;
+/* ---- Full-bleed shell -------------------------------------------------- */
+.app-shell {
+  min-height: 100vh;
   width: 100%;
-  border-radius: clamp(14px, 2.4vw, 26px);
   background: var(--color-screen);
-  overflow: hidden;
-  /* the glass bulge + dark vignette into the corners */
-  box-shadow:
-    0 0 0 2px #0c0a11,
-    0 0 0 7px #2a2533,
-    0 0 0 8px #0c0a11,
-    0 18px 50px -12px rgba(0, 0, 0, 0.7);
-}
-
-/* content scrolls inside the glass */
-.crt-scroll {
-  position: absolute;
-  inset: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-}
-
-/* scanlines + vignette ride on top, fixed to the glass, never scrolling */
-.crt-veil {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 50;
-  border-radius: inherit;
-  /* vignette */
-  box-shadow:
-    inset 0 0 70px 10px rgba(22, 19, 28, 0.28),
-    inset 0 0 160px 40px rgba(22, 19, 28, 0.18);
-}
-.crt-veil::before {
-  /* scanlines */
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(22, 19, 28, 0.05) 0px,
-    rgba(22, 19, 28, 0.05) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  mix-blend-mode: multiply;
-  opacity: 0.6;
-}
-.crt-veil::after {
-  /* soft top glass glare */
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.12) 0%,
-    transparent 22%
-  );
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .crt-screen {
-    animation: crt-flicker 6s steps(60) infinite;
-  }
-  @keyframes crt-flicker {
-    0%, 97%, 100% { filter: none; }
-    98% { filter: brightness(1.03); }
-    99% { filter: brightness(0.98); }
-  }
 }
 
 /* ---- Type helpers ------------------------------------------------------ */
@@ -299,3 +224,84 @@
   background: var(--color-ink);
   color: var(--color-screen);
 }
+
+/* ---- DEX terminal ------------------------------------------------------ */
+.mono { font-family: var(--font-pixel); }
+
+/* blinking cursor for the command bar */
+.blink { animation: blink 1.1s steps(2, start) infinite; }
+@keyframes blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .blink { animation: none; } }
+
+/* scrolling ticker tape */
+.ticker {
+  overflow: hidden;
+  border-top: 2px solid var(--color-ink);
+  border-bottom: 2px solid var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-screen);
+}
+.ticker-track {
+  display: inline-flex;
+  gap: 2.2rem;
+  white-space: nowrap;
+  padding: 0.4rem 0;
+  animation: tickerScroll 38s linear infinite;
+}
+@keyframes tickerScroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.ticker:hover .ticker-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .ticker-track { animation: none; } }
+
+/* the market table */
+.dex {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+.dex thead th {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-screen-2);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-soft);
+  text-align: right;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 2px solid var(--color-ink);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.dex thead th.left { text-align: left; }
+.dex thead th:hover { color: var(--color-ink); }
+.dex tbody td {
+  padding: 0.55rem 0.75rem;
+  text-align: right;
+  border-bottom: 1px solid var(--color-line);
+  white-space: nowrap;
+}
+.dex tbody td.left { text-align: left; }
+.dex tbody tr { transition: background-color 0.1s; }
+.dex tbody tr:hover { background: color-mix(in srgb, var(--color-yellow) 14%, transparent); }
+.dex .num { font-variant-numeric: tabular-nums; }
+
+/* price flash on update */
+.flash-up { animation: flashUp 0.6s ease; }
+.flash-down { animation: flashDown 0.6s ease; }
+@keyframes flashUp {
+  0% { background: color-mix(in srgb, var(--color-green) 45%, transparent); }
+  100% { background: transparent; }
+}
+@keyframes flashDown {
+  0% { background: color-mix(in srgb, var(--color-red) 40%, transparent); }
+  100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .flash-up, .flash-down { animation: none; } }

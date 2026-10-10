@@ -31,7 +31,7 @@ export default function App() {
             <Route path="/" element={<Landing />} />
             {/* Referral invite link target */}
             <Route path="/join/:code" element={<Join />} />
-            {/* Public — no X auth needed */}
+            {/* Public, no X auth needed */}
             <Route path="/watcher" element={<Watcher />} />
             <Route
               path="/app"

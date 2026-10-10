@@ -1,5 +1,5 @@
 -- ============================================================================
---  The Bloom Herald — Supabase schema
+--  The Bloom Herald, Supabase schema
 --  Run this in the Supabase SQL editor (Dashboard → SQL → New query → Run).
 --
 --  ⚠️  DESTRUCTIVE FIRST STEP: this drops the tables from the previous

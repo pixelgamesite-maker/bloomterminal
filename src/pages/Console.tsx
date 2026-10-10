@@ -129,7 +129,7 @@ function AgentHub({ setTab }: { setTab: (t: Tab) => void }) {
           </Button>
         </div>
         <p className="text-center text-xs text-ink-soft">
-          <Lock size={11} className="mb-0.5 inline" /> This is a one-time choice — your agent and
+          <Lock size={11} className="mb-0.5 inline" /> This is a one-time choice, your agent and
           market lock after this.
         </p>
       </div>
@@ -212,7 +212,7 @@ function WorkerCard() {
       </div>
 
       <div className="mt-5 grid w-full grid-cols-2 gap-3">
-        <Stat label="On duty" value={w.deployedAt ? duration(Date.now() - w.deployedAt) : "—"} />
+        <Stat label="On duty" value={w.deployedAt ? duration(Date.now() - w.deployedAt) : "-"} />
         <Stat label="Boost" value={`×${cls.modifier}`} />
       </div>
       <p className="mt-3 text-xs text-ink-soft">
@@ -388,7 +388,7 @@ function RewardsTab() {
         <div className="pixel text-[0.6rem] text-ink-soft">BLOOM</div>
         <div className="display mt-2 text-2xl">Accruing while your agent works</div>
         <div className="mt-1 text-xs text-ink-soft">
-          The rewards engine goes live soon — balances will appear here then.
+          The rewards engine goes live soon, balances will appear here then.
         </div>
       </Panel>
 

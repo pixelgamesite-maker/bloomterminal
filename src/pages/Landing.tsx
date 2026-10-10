@@ -80,7 +80,7 @@ export default function Landing() {
         <section className="mt-12">
           <h2 className="display text-center text-xl">How it works</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <Step n="1" art={CLASS_ART.analyst} title="Pick your agent" blurb="Choose one of four agents and a market — stocks or crypto." />
+            <Step n="1" art={CLASS_ART.analyst} title="Pick your agent" blurb="Choose one of four agents and a market, stocks or crypto." />
             <Step n="2" art={CLASS_ART.scout} title="Do your tasks" blurb="A few one-time tasks: follow, bind a wallet, invite friends." />
             <Step n="3" art={CLASS_ART.momentum} title="Earn Bloom" blurb="Your agent works and racks up Bloom. Mint later to multiply." />
           </div>
@@ -94,7 +94,7 @@ export default function Landing() {
               art="/robinhood-watcher.png"
               title="Robinhood Watcher"
               status="soon"
-              blurb="Track tokenized stocks — prices, charts, movers."
+              blurb="Track tokenized stocks, prices, charts, movers."
               cta="Preview"
               onClick={() => navigate("/watcher")}
             />
@@ -122,7 +122,7 @@ export default function Landing() {
             <img src={LOGO} className="pixel h-6 w-6 rounded" alt="" />
             <span className="pixel text-[0.6rem]">BLOOM TERMINAL</span>
           </div>
-          <p className="text-xs text-ink-soft">Bloom NFT minting — coming soon.</p>
+          <p className="text-xs text-ink-soft">Bloom NFT minting, coming soon.</p>
         </footer>
       </div>
 

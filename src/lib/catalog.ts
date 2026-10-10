@@ -1,7 +1,7 @@
 import type { Mission, MarketAsset, ClassInfo, MarketKind } from "./types";
 
 // Static catalog: agent classes, selectable markets/assets, launch tasks, links.
-// (No fabricated prices or balances — those come from real data when wired.)
+// (No fabricated prices or balances, those come from real data when wired.)
 
 export const WORKER_CLASSES: ClassInfo[] = [
   {

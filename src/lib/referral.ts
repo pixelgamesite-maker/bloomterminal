@@ -8,7 +8,7 @@ export function captureRef(code: string) {
     const c = code.replace(/^@/, "").trim();
     if (c) localStorage.setItem(REF_KEY, c);
   } catch {
-    /* localStorage unavailable — referral just won't attribute */
+    /* localStorage unavailable, referral just won't attribute */
   }
 }
 

@@ -30,7 +30,7 @@ import { captureRefFromUrl } from "@/lib/referral";
 /*
  * The terminal store. Auth is real X OAuth via Supabase when configured.
  * The in-app game state (missions, agents, worker, rewards) is still local
- * for now — each action maps 1:1 to a future API call so persistence can be
+ * for now, each action maps 1:1 to a future API call so persistence can be
  * layered on without changing the UI.
  */
 
@@ -58,7 +58,7 @@ interface TerminalValue extends TerminalState {
   multiplier: number;
   /** base accrued on the current worker */
   baseBalance: number;
-  /** base × multiplier — what the user sees */
+  /** base × multiplier, what the user sees */
   displayBalance: number;
   claimable: number;
   rewardState: RewardState;
@@ -188,7 +188,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
 
   const signInWithX = useCallback(async () => {
     if (supabase) {
-      // Real X OAuth (OAuth 2.0 — provider "x"; legacy "twitter"/OAuth 1.0a is
+      // Real X OAuth (OAuth 2.0, provider "x"; legacy "twitter"/OAuth 1.0a is
       // being deprecated). Browser redirects to X and back to /app, where
       // detectSessionInUrl + onAuthStateChange pick the session up.
       await supabase.auth.signInWithOAuth({
