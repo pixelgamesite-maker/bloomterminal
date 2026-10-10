@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Search, RefreshCw, Image as ImageIcon, ArrowDown, ArrowUp } from "lucide-react";
+import { ArrowLeft, Search, RefreshCw, Image as ImageIcon, ArrowDown, ArrowUp, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   fetchTokens,
+  fetchNfts,
   fmtUsd,
   fmtCompact,
   fmtUsdCompact,
   fmtPct,
+  fmtNative,
+  fmtInt,
   spreadPct,
   rangePos,
   WatcherError,
   type Token,
   type Market,
+  type NftCollection,
 } from "@/lib/watcher";
 
 type Tab = "tokens" | "nfts";
@@ -502,19 +506,150 @@ function StatTile({ label, value, live, hint }: { label: string; value: string; 
 /* ---------------- nfts ---------------- */
 
 function NftsTab() {
+  const [cols, setCols] = useState<NftCollection[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [q, setQ] = useState("");
+  const abort = useRef<AbortController | null>(null);
+
+  async function load() {
+    abort.current?.abort();
+    const ac = new AbortController();
+    abort.current = ac;
+    setRefreshing(true);
+    try {
+      const data = await fetchNfts(ac.signal);
+      if (ac.signal.aborted) return;
+      setCols(data.collections);
+      setUpdatedAt(new Date());
+      setError(null);
+    } catch (e) {
+      if (ac.signal.aborted) return;
+      setError(e instanceof WatcherError ? e.message : "Couldn't reach the NFT feed.");
+    } finally {
+      if (!ac.signal.aborted) setRefreshing(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+    return () => abort.current?.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const rows = useMemo(() => {
+    if (!cols) return null;
+    const needle = q.trim().toLowerCase();
+    return needle ? cols.filter((c) => c.name.toLowerCase().includes(needle) || c.slug.toLowerCase().includes(needle)) : cols;
+  }, [cols, q]);
+
   return (
-    <div className="card-soft flex flex-col items-center p-10 text-center">
-      <div className="grid h-16 w-16 place-items-center rounded-2xl border-2 border-ink bg-screen-2">
-        <ImageIcon size={28} className="text-ink-soft" />
+    <div>
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search collection…"
+            className="w-full rounded-lg border-2 border-ink bg-screen py-2 pl-9 pr-3 text-sm font-semibold outline-none placeholder:text-ink-soft focus:ring-2 focus:ring-pink"
+          />
+        </div>
+        <button onClick={load} disabled={refreshing} title="Refresh" className="btn btn-yellow h-10 px-3">
+          <RefreshCw size={15} className={refreshing ? "animate-spin" : ""} />
+        </button>
       </div>
-      <div className="mt-4 flex items-center gap-2">
-        <h2 className="display text-lg">NFT collections</h2>
-        <Badge variant="yellow">Coming soon</Badge>
+
+      <div className="mt-2 flex items-center justify-between text-xs text-ink-soft">
+        <span>{cols ? `${rows?.length ?? 0} collections on Robinhood Chain` : "Loading collections…"}</span>
+        {updatedAt && <span>Updated {updatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>}
       </div>
-      <p className="mt-2 max-w-sm text-sm text-ink-soft">
-        Floor prices, holders and the Bloom collection, wiring up to OpenSea next.
-        Tokens are live now, check the Tokens tab.
+
+      {error && !cols && <NftError message={error} onRetry={load} />}
+
+      {!cols && !error && (
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="card-soft h-56 animate-pulse opacity-60" />
+          ))}
+        </div>
+      )}
+
+      {rows && (
+        rows.length === 0 ? (
+          <p className="py-10 text-center text-sm text-ink-soft">No collections match "{q}".</p>
+        ) : (
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {rows.map((c) => (
+              <NftCard key={c.slug} c={c} />
+            ))}
+          </div>
+        )
+      )}
+
+      <p className="mt-4 text-center text-[0.65rem] text-ink-soft">
+        Collections and floors from OpenSea. NFTs are highly volatile, info only, not a quote to trade.
       </p>
+    </div>
+  );
+}
+
+function NftCard({ c }: { c: NftCollection }) {
+  const [broken, setBroken] = useState(false);
+  return (
+    <a
+      href={c.url}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="card-soft group flex flex-col overflow-hidden transition-transform hover:-translate-y-0.5"
+    >
+      <div className="relative aspect-square w-full bg-screen-2">
+        {c.image && !broken ? (
+          <img src={c.image} onError={() => setBroken(true)} className="h-full w-full object-cover" alt="" />
+        ) : (
+          <div className="grid h-full w-full place-items-center">
+            <ImageIcon size={28} className="text-ink-soft" />
+          </div>
+        )}
+        <span className="absolute right-1.5 top-1.5 rounded bg-ink/80 p-1 text-screen opacity-0 transition-opacity group-hover:opacity-100">
+          <ExternalLink size={12} />
+        </span>
+      </div>
+      <div className="flex flex-1 flex-col p-2.5">
+        <div className="display truncate text-sm leading-tight">{c.name}</div>
+        <div className="mt-2 grid grid-cols-2 gap-x-2 gap-y-1 text-[0.68rem]">
+          <Stat label="Floor" value={fmtNative(c.floor, c.floorSymbol)} strong />
+          <Stat label="24h vol" value={fmtNative(c.oneDayVolume, c.floorSymbol)} />
+          <Stat label="Owners" value={fmtInt(c.owners)} />
+          <Stat label="Items" value={fmtInt(c.items)} />
+        </div>
+      </div>
+    </a>
+  );
+}
+
+function Stat({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-baseline justify-between gap-1">
+      <span className="text-ink-soft">{label}</span>
+      <span className={`tabular-nums ${strong ? "display" : "font-semibold"}`}>{value}</span>
+    </div>
+  );
+}
+
+function NftError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  const needsKey = /opensea api key/i.test(message);
+  return (
+    <div className="card-soft mt-3 flex flex-col items-center p-8 text-center">
+      <div className="grid h-14 w-14 place-items-center rounded-2xl border-2 border-ink bg-screen-2">
+        <ImageIcon size={24} className="text-ink-soft" />
+      </div>
+      <p className="display mt-3 text-sm">{needsKey ? "Almost there" : "The gallery is quiet"}</p>
+      <p className="mt-1 max-w-sm text-xs text-ink-soft">{message}</p>
+      {!needsKey && (
+        <button className="btn btn-pink mt-3 h-9 px-3 text-xs" onClick={onRetry}>Try again</button>
+      )}
     </div>
   );
 }

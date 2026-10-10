@@ -36,6 +36,25 @@ export interface TokensResponse {
   generatedAt: string;
 }
 
+export interface NftCollection {
+  slug: string;
+  name: string;
+  image: string | null;
+  floor: number | null;
+  floorSymbol: string | null;
+  oneDayVolume: number | null;
+  totalVolume: number | null;
+  owners: number | null;
+  items: number | null;
+  url: string;
+}
+
+export interface NftsResponse {
+  collections: NftCollection[];
+  count: number;
+  generatedAt: string;
+}
+
 const FN = (name: string) => (env.supabaseUrl ? `${env.supabaseUrl}/functions/v1/${name}` : "");
 const ENDPOINT: Record<Market, string> = { stocks: "rh-tokens", crypto: "crypto" };
 
@@ -60,6 +79,23 @@ export async function fetchTokens(market: Market = "stocks", signal?: AbortSigna
   }
   const data = (await res.json()) as TokensResponse & { error?: string };
   if (data.error) throw new WatcherError(data.error);
+  return data;
+}
+
+/** NFT collections on Robinhood Chain (via the nfts Edge Function / OpenSea). */
+export async function fetchNfts(signal?: AbortSignal): Promise<NftsResponse> {
+  const url = FN("nfts");
+  if (!url) throw new WatcherError("Set VITE_SUPABASE_URL and deploy the nfts function.");
+  const res = await fetch(url, {
+    signal,
+    headers: env.supabaseAnonKey
+      ? { apikey: env.supabaseAnonKey, authorization: `Bearer ${env.supabaseAnonKey}` }
+      : {},
+  });
+  const data = (await res.json().catch(() => ({}))) as NftsResponse & { error?: string };
+  if (!res.ok || data.error) {
+    throw new WatcherError(data.error ?? `Feed returned ${res.status}.`);
+  }
   return data;
 }
 
@@ -100,6 +136,22 @@ export function fmtPct(v: number | null): string {
   if (v == null) return DASH;
   const sign = v > 0 ? "+" : "";
   return `${sign}${v.toFixed(2)}%`;
+}
+
+/** A native-token amount with its symbol, e.g. "0.0042 ETH". */
+export function fmtNative(v: number | null, symbol: string | null): string {
+  if (v == null) return DASH;
+  const s =
+    v >= 1 ? v.toLocaleString("en-US", { maximumFractionDigits: 3 })
+    : v >= 0.0001 ? v.toFixed(4)
+    : v.toPrecision(2);
+  return symbol ? `${s} ${symbol}` : s;
+}
+
+/** Plain integer with grouping, e.g. "1,662". */
+export function fmtInt(v: number | null): string {
+  if (v == null) return DASH;
+  return Math.round(v).toLocaleString("en-US");
 }
 
 /** Spread as a percent of mid, a rough liquidity tell. */
