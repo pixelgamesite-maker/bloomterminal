@@ -161,6 +161,21 @@ async function listAllCollections(chain: string): Promise<OsCollection[]> {
   return (await collectUnion(chain)).all;
 }
 
+/**
+ * The set we actually stat + index: top collections by 7d volume (the real
+ * trending/active markets) plus the newest page, deduped. Statting all ~1000
+ * collections is slow and pointless, most are dead. This stays focused.
+ */
+async function collectForIndex(chain: string): Promise<OsCollection[]> {
+  const seen = new Map<string, OsCollection>();
+  const passes: [string, number][] = [["seven_day_volume", 3], ["created_date", 1]];
+  for (const [ob, pages] of passes) {
+    const { rows } = await listPass(chain, ob, pages);
+    for (const c of rows) if (c?.collection && !seen.has(c.collection)) seen.set(c.collection, c);
+  }
+  return [...seen.values()];
+}
+
 async function statsFor(c: OsCollection): Promise<NftCollection | null> {
   try {
     const r = await fetch(`${OS}/collections/${c.collection}/stats`, { headers: osHeaders() });
@@ -209,7 +224,7 @@ async function refreshAll(): Promise<void> {
   refreshing = true;
   try {
     const chain = await resolveChain();
-    const base = await listAllCollections(chain);
+    const base = await collectForIndex(chain);
     for (let i = 0; i < base.length; i += STATS_CONCURRENCY) {
       const chunk = base.slice(i, i + STATS_CONCURRENCY);
       const res = (await Promise.all(chunk.map(statsFor))).filter((x): x is NftCollection => !!x);

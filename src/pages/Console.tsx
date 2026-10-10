@@ -251,6 +251,8 @@ function TasksTab({ setTab }: { setTab: (t: Tab) => void }) {
   const done = t.missions.filter((m) => m.done).length;
   const progress = (done / t.missions.length) * 100;
   const short = t.address ? `${t.address.slice(0, 6)}…${t.address.slice(-4)}` : null;
+  // Wallet bind is the final step: locked until every other task is done.
+  const othersDone = t.missions.filter((m) => m.id !== "bind-wallet").every((m) => m.done);
 
   return (
     <div className="space-y-4">
@@ -278,6 +280,8 @@ function TasksTab({ setTab }: { setTab: (t: Tab) => void }) {
               <div className="truncate text-xs text-ink-soft">
                 {m.id === "bind-wallet" && m.done && short ? (
                   <span className="font-mono">{short}</span>
+                ) : m.id === "bind-wallet" && !othersDone ? (
+                  "Unlocks once your other tasks are done"
                 ) : (
                   m.description
                 )}
@@ -286,9 +290,15 @@ function TasksTab({ setTab }: { setTab: (t: Tab) => void }) {
             {m.done ? (
               <Badge variant="green">done</Badge>
             ) : m.id === "bind-wallet" ? (
-              <Button size="sm" variant="blue" onClick={() => setBinding(true)}>
-                Bind
-              </Button>
+              othersDone ? (
+                <Button size="sm" variant="blue" onClick={() => setBinding(true)}>
+                  Bind
+                </Button>
+              ) : (
+                <Button size="sm" disabled title="Finish the other tasks first">
+                  <Lock size={13} /> Locked
+                </Button>
+              )
             ) : m.id === "invite-agents" ? (
               <Button size="sm" onClick={() => setTab("invites")}>
                 Invite
