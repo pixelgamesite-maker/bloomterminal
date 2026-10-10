@@ -4,6 +4,9 @@
 
 import { env } from "./config";
 
+/** Which market the Watcher is showing. */
+export type Market = "stocks" | "crypto";
+
 export interface Token {
   symbol: string;
   name: string;
@@ -21,8 +24,10 @@ export interface Token {
   generatedAt: string | null;
   /** Percent change over the last 24h (null until history accrues). */
   change24h: number | null;
-  /** Downsampled intraday mids for the row sparkline. */
+  /** Downsampled mids for the row sparkline. */
   spark: number[];
+  /** USD market cap (crypto only; null for stocks). */
+  marketCap?: number | null;
 }
 
 export interface TokensResponse {
@@ -31,18 +36,20 @@ export interface TokensResponse {
   generatedAt: string;
 }
 
-const FN_URL = env.supabaseUrl ? `${env.supabaseUrl}/functions/v1/rh-tokens` : "";
+const FN = (name: string) => (env.supabaseUrl ? `${env.supabaseUrl}/functions/v1/${name}` : "");
+const ENDPOINT: Record<Market, string> = { stocks: "rh-tokens", crypto: "crypto" };
 
 export class WatcherError extends Error {}
 
-/** All active tokenized stocks with live quotes. */
-export async function fetchTokens(signal?: AbortSignal): Promise<TokensResponse> {
-  if (!FN_URL) {
+/** Live markets for the chosen side: tokenized stocks or crypto. */
+export async function fetchTokens(market: Market = "stocks", signal?: AbortSignal): Promise<TokensResponse> {
+  const url = FN(ENDPOINT[market]);
+  if (!url) {
     throw new WatcherError(
-      "Price feed isn't wired up yet. Set VITE_SUPABASE_URL and deploy the rh-tokens function."
+      "Price feed isn't wired up yet. Set VITE_SUPABASE_URL and deploy the feed functions."
     );
   }
-  const res = await fetch(FN_URL, {
+  const res = await fetch(url, {
     signal,
     headers: env.supabaseAnonKey
       ? { apikey: env.supabaseAnonKey, authorization: `Bearer ${env.supabaseAnonKey}` }
@@ -75,6 +82,17 @@ export function fmtUsd(v: number | null): string {
 export function fmtCompact(v: number | null): string {
   if (v == null) return DASH;
   return v.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 });
+}
+
+/** Compact USD, e.g. "$1.2B". For market cap / crypto volume. */
+export function fmtUsdCompact(v: number | null | undefined): string {
+  if (v == null) return DASH;
+  return v.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    notation: "compact",
+    maximumFractionDigits: 1,
+  });
 }
 
 /** Signed percent, e.g. "+1.24%" / "-0.80%". */

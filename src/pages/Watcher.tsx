@@ -6,11 +6,13 @@ import {
   fetchTokens,
   fmtUsd,
   fmtCompact,
+  fmtUsdCompact,
   fmtPct,
   spreadPct,
   rangePos,
   WatcherError,
   type Token,
+  type Market,
 } from "@/lib/watcher";
 
 type Tab = "tokens" | "nfts";
@@ -18,21 +20,34 @@ const REFRESH_MS = 20_000;
 
 export default function Watcher() {
   const [tab, setTab] = useState<Tab>("tokens");
-  const feed = useFeed();
+  const [market, setMarket] = useState<Market>("stocks");
+  const feed = useFeed(market);
   return (
     <div className="min-h-screen">
-      <TopBar />
+      <TopBar market={market} />
       <TickerTape tokens={feed.tokens} />
       <div className="mx-auto max-w-6xl px-4 py-5">
-        <div className="flex items-center gap-2">
-          <button className="tab" data-active={tab === "tokens"} onClick={() => setTab("tokens")}>
-            Tokens
-          </button>
-          <button className="tab" data-active={tab === "nfts"} onClick={() => setTab("nfts")}>
-            NFTs
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <button className="tab" data-active={tab === "tokens"} onClick={() => setTab("tokens")}>
+              Tokens
+            </button>
+            <button className="tab" data-active={tab === "nfts"} onClick={() => setTab("nfts")}>
+              NFTs
+            </button>
+          </div>
+          {tab === "tokens" && (
+            <div className="tabs">
+              <button className="tab" data-active={market === "stocks"} onClick={() => setMarket("stocks")}>
+                Tokenized stocks
+              </button>
+              <button className="tab" data-active={market === "crypto"} onClick={() => setMarket("crypto")}>
+                Crypto
+              </button>
+            </div>
+          )}
         </div>
-        <div className="mt-4">{tab === "tokens" ? <TokensTab feed={feed} /> : <NftsTab />}</div>
+        <div className="mt-4">{tab === "tokens" ? <TokensTab feed={feed} market={market} /> : <NftsTab />}</div>
       </div>
     </div>
   );
@@ -42,7 +57,7 @@ type Feed = ReturnType<typeof useFeed>;
 
 /* ---------------- shared live feed ---------------- */
 
-function useFeed() {
+function useFeed(market: Market) {
   const [tokens, setTokens] = useState<Token[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
@@ -51,6 +66,8 @@ function useFeed() {
   const prevMids = useRef<Map<string, number>>(new Map());
   const dir = useRef<Map<string, "up" | "down">>(new Map());
   const abort = useRef<AbortController | null>(null);
+  const marketRef = useRef(market);
+  marketRef.current = market;
 
   async function load() {
     abort.current?.abort();
@@ -58,7 +75,7 @@ function useFeed() {
     abort.current = ac;
     setRefreshing(true);
     try {
-      const data = await fetchTokens(ac.signal);
+      const data = await fetchTokens(marketRef.current, ac.signal);
       if (ac.signal.aborted) return;
       const d = new Map<string, "up" | "down">();
       for (const t of data.tokens) {
@@ -81,7 +98,12 @@ function useFeed() {
     }
   }
 
+  // Reload whenever the market changes; clear the old side's data + flashes.
   useEffect(() => {
+    prevMids.current = new Map();
+    dir.current = new Map();
+    setTokens(null);
+    setError(null);
     load();
     const id = setInterval(load, REFRESH_MS);
     return () => {
@@ -89,14 +111,15 @@ function useFeed() {
       abort.current?.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [market]);
 
   return { tokens, error, updatedAt, refreshing, tick, dir: dir.current, reload: load };
 }
 
 /* ---------------- top bar ---------------- */
 
-function TopBar() {
+function TopBar({ market }: { market: Market }) {
+  const label = market === "stocks" ? "ROBINHOOD CHAIN · 4663" : "CRYPTO · TOP 50 · USD";
   return (
     <div className="sticky top-0 z-30 border-b-2 border-ink bg-screen/95 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-2.5">
@@ -114,7 +137,7 @@ function TopBar() {
         </div>
         <div className="flex items-center gap-2 text-[0.65rem] text-ink-soft">
           <span className="dot dot-live" />
-          <span className="pixel">ROBINHOOD CHAIN · 4663</span>
+          <span className="pixel">{label}</span>
         </div>
       </div>
     </div>
@@ -125,7 +148,7 @@ function TopBar() {
 
 function TickerTape({ tokens }: { tokens: Token[] | null }) {
   if (!tokens || tokens.length === 0) {
-    return <div className="ticker"><div className="ticker-track pixel text-[0.6rem]">LIVE MARKET FEED · ROBINHOOD CHAIN · LOADING…</div></div>;
+    return <div className="ticker"><div className="ticker-track pixel text-[0.6rem]">LIVE MARKET FEED · LOADING…</div></div>;
   }
   const line = tokens.slice(0, 40);
   const Item = ({ t }: { t: Token }) => (
@@ -149,13 +172,23 @@ function TickerTape({ tokens }: { tokens: Token[] | null }) {
 
 /* ---------------- tokens ---------------- */
 
-type SortKey = "symbol" | "mid" | "change" | "bid" | "ask" | "spread" | "volume" | "range";
+type SortKey = "symbol" | "mid" | "change" | "bid" | "ask" | "spread" | "volume" | "range" | "mcap";
 type SortDir = "asc" | "desc";
 
-function TokensTab({ feed }: { feed: Feed }) {
+function TokensTab({ feed, market }: { feed: Feed; market: Market }) {
   const { tokens, error, updatedAt, refreshing, tick, dir, reload } = feed;
+  const isCrypto = market === "crypto";
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({ key: "volume", dir: "desc" });
+
+  // When flipping sides, a stock-only sort key (spread/bid/ask) makes no sense
+  // for crypto, so fall back to volume.
+  useEffect(() => {
+    if (isCrypto && (sort.key === "spread" || sort.key === "bid" || sort.key === "ask")) {
+      setSort({ key: "volume", dir: "desc" });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCrypto]);
 
   function toggleSort(key: SortKey) {
     setSort((s) =>
@@ -180,6 +213,7 @@ function TokensTab({ feed }: { feed: Feed }) {
         case "spread": return spreadPct(t) ?? 1e9;
         case "range": return rangePos(t) ?? -1;
         case "volume": return t.volume ?? -1;
+        case "mcap": return t.marketCap ?? -1;
       }
     };
     filtered.sort((a, b) => {
@@ -199,7 +233,8 @@ function TokensTab({ feed }: { feed: Feed }) {
     const changes = tokens.filter((t) => t.change24h != null);
     const gainers = changes.filter((t) => (t.change24h as number) > 0).length;
     const hasChange = changes.length > 0;
-    return { markets: tokens.length, avgSpread, gainers, decliners: changes.length - gainers, hasChange };
+    const totalVol = tokens.reduce((a, t) => a + (t.volume ?? 0), 0) || null;
+    return { markets: tokens.length, avgSpread, gainers, decliners: changes.length - gainers, hasChange, totalVol };
   }, [tokens]);
 
   return (
@@ -207,11 +242,15 @@ function TokensTab({ feed }: { feed: Feed }) {
       {/* stat strip */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatTile label="Markets" value={stats ? String(stats.markets) : "-"} />
-        <StatTile label="Avg spread" value={stats?.avgSpread != null ? `${stats.avgSpread.toFixed(2)}%` : "-"} />
+        {isCrypto ? (
+          <StatTile label="24h volume" value={fmtUsdCompact(stats?.totalVol ?? null)} hint="all markets" />
+        ) : (
+          <StatTile label="Avg spread" value={stats?.avgSpread != null ? `${stats.avgSpread.toFixed(2)}%` : "-"} />
+        )}
         <StatTile
           label="24h movers"
           value={stats?.hasChange ? `${stats.gainers} / ${stats.decliners}` : "-"}
-          hint={stats?.hasChange ? "up / down" : "building history"}
+          hint={stats?.hasChange ? "up / down" : isCrypto ? "up / down" : "building history"}
         />
         <StatTile
           label="Updated"
@@ -227,7 +266,7 @@ function TokensTab({ feed }: { feed: Feed }) {
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search ticker or company…"
+            placeholder={isCrypto ? "Search coin or ticker…" : "Search ticker or company…"}
             className="w-full rounded-lg border-2 border-ink bg-screen py-2 pl-9 pr-3 text-sm font-semibold outline-none placeholder:text-ink-soft focus:ring-2 focus:ring-pink"
           />
         </div>
@@ -269,9 +308,15 @@ function TokensTab({ feed }: { feed: Feed }) {
                   <SortTh label="Price" k="mid" sort={sort} onSort={toggleSort} />
                   <SortTh label="24h" k="change" sort={sort} onSort={toggleSort} />
                   <th className="hidden sm:table-cell" style={{ width: 84 }}>Trend</th>
-                  <SortTh label="Spread" k="spread" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
-                  <SortTh label="Bid" k="bid" sort={sort} onSort={toggleSort} className="hidden lg:table-cell" />
-                  <SortTh label="Ask" k="ask" sort={sort} onSort={toggleSort} className="hidden lg:table-cell" />
+                  {isCrypto ? (
+                    <SortTh label="Mkt cap" k="mcap" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
+                  ) : (
+                    <>
+                      <SortTh label="Spread" k="spread" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
+                      <SortTh label="Bid" k="bid" sort={sort} onSort={toggleSort} className="hidden lg:table-cell" />
+                      <SortTh label="Ask" k="ask" sort={sort} onSort={toggleSort} className="hidden lg:table-cell" />
+                    </>
+                  )}
                   <th className="hidden xl:table-cell" style={{ width: 150 }}>Day range</th>
                   <SortTh label="Vol" k="volume" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
                 </tr>
@@ -285,7 +330,7 @@ function TokensTab({ feed }: { feed: Feed }) {
                   </tr>
                 ) : (
                   rows.map((t, i) => (
-                    <Row key={t.symbol} t={t} rank={i + 1} flash={dir.get(t.symbol)} tick={tick} />
+                    <Row key={t.symbol} t={t} rank={i + 1} flash={dir.get(t.symbol)} tick={tick} isCrypto={isCrypto} />
                   ))
                 )}
               </tbody>
@@ -295,7 +340,9 @@ function TokensTab({ feed }: { feed: Feed }) {
       )}
 
       <p className="mt-3 text-center text-[0.65rem] text-ink-soft">
-        Prices from Robinhood Chain, for information only, not a quote to trade.
+        {isCrypto
+          ? "Prices from CoinGecko, for information only, not a quote to trade."
+          : "Prices from Robinhood Chain, for information only, not a quote to trade."}
       </p>
     </div>
   );
@@ -327,7 +374,7 @@ function SortTh({
   );
 }
 
-function Row({ t, rank, flash, tick }: { t: Token; rank: number; flash?: "up" | "down"; tick: number }) {
+function Row({ t, rank, flash, tick, isCrypto }: { t: Token; rank: number; flash?: "up" | "down"; tick: number; isCrypto: boolean }) {
   const spread = spreadPct(t);
   return (
     <tr>
@@ -360,13 +407,21 @@ function Row({ t, rank, flash, tick }: { t: Token; rank: number; flash?: "up" | 
           <Sparkline data={t.spark} up={t.change24h == null ? null : t.change24h >= 0} />
         </div>
       </td>
-      <td className="num hidden md:table-cell">{spread != null ? `${spread.toFixed(2)}%` : "-"}</td>
-      <td className="num hidden text-ink-soft lg:table-cell">{fmtUsd(t.bid)}</td>
-      <td className="num hidden text-ink-soft lg:table-cell">{fmtUsd(t.ask)}</td>
+      {isCrypto ? (
+        <td className="num hidden text-ink-soft md:table-cell">{fmtUsdCompact(t.marketCap)}</td>
+      ) : (
+        <>
+          <td className="num hidden md:table-cell">{spread != null ? `${spread.toFixed(2)}%` : "-"}</td>
+          <td className="num hidden text-ink-soft lg:table-cell">{fmtUsd(t.bid)}</td>
+          <td className="num hidden text-ink-soft lg:table-cell">{fmtUsd(t.ask)}</td>
+        </>
+      )}
       <td className="hidden xl:table-cell">
         <DayRange t={t} />
       </td>
-      <td className="num hidden text-ink-soft md:table-cell">{fmtCompact(t.volume)}</td>
+      <td className="num hidden text-ink-soft md:table-cell">
+        {isCrypto ? fmtUsdCompact(t.volume) : fmtCompact(t.volume)}
+      </td>
     </tr>
   );
 }
