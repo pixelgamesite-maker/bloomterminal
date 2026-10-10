@@ -12,7 +12,12 @@
 // Deploy:  supabase functions deploy rh-tokens --no-verify-jwt
 //   (--no-verify-jwt keeps the Watcher public, anyone can read prices.)
 
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+
 const RH_BASE = "https://api.robinhood.com/rhj";
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
+const SPARK_POINTS = 40;
 const ASSETS_TTL = 5 * 60 * 1000; // asset list barely changes
 const QUOTE_TTL = 15 * 1000; // prices: 15s, matches upstream cache
 const PRICE_CONCURRENCY = 12; // stay well under the 60 req/s budget
@@ -69,6 +74,8 @@ interface Token {
   contractAddress: string | null;
   chainId: number | null;
   generatedAt: string | null;
+  change24h: number | null;
+  spark: number[];
 }
 
 // ---- tiny module-level cache (survives while the instance is warm) ----
@@ -140,7 +147,46 @@ function merge(asset: RhAsset, q: RhQuote | null): Token {
     contractAddress: dep?.contractAddress ?? null,
     chainId: dep?.chainId ?? null,
     generatedAt: q?.generatedAt ?? null,
+    change24h: null,
+    spark: [],
   };
+}
+
+/** Evenly sample an array down to at most n points, keeping first and last. */
+function downsample(arr: number[], n: number): number[] {
+  if (arr.length <= n) return arr;
+  const out: number[] = [];
+  const step = (arr.length - 1) / (n - 1);
+  for (let i = 0; i < n; i++) out.push(arr[Math.round(i * step)]);
+  return out;
+}
+
+/**
+ * Attach 24h change + sparkline from price_history (written by rh-snapshot).
+ * Best-effort: if the table/RPC isn't there yet, tokens keep change=null,
+ * spark=[] and the Watcher simply shows no trend until history accrues.
+ */
+async function enrich(tokens: Token[]): Promise<void> {
+  if (!SUPABASE_URL || !ANON_KEY) return;
+  try {
+    const sb = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false } });
+    const { data, error } = await sb.rpc("price_series_24h");
+    if (error || !Array.isArray(data)) return;
+    const series = new Map<string, { first: number; points: number[] }>();
+    for (const r of data as { symbol: string; first_mid: number | null; points: number[] | null }[]) {
+      if (r.first_mid == null) continue;
+      series.set(r.symbol, { first: r.first_mid, points: (r.points ?? []).filter((p) => p != null) });
+    }
+    for (const t of tokens) {
+      const s = series.get(t.symbol);
+      if (!s) continue;
+      const points = t.mid != null ? [...s.points, t.mid] : s.points;
+      t.spark = downsample(points, SPARK_POINTS);
+      if (t.mid != null && s.first) t.change24h = ((t.mid - s.first) / s.first) * 100;
+    }
+  } catch {
+    // no history yet, leave defaults
+  }
 }
 
 function isActive(a: RhAsset): boolean {
@@ -173,6 +219,8 @@ Deno.serve(async (req: Request) => {
     const tokens = assets
       .map((a) => merge(a, quotes.get(a.tokenSymbol) ?? null))
       .sort((x, y) => (y.volume ?? 0) - (x.volume ?? 0));
+
+    await enrich(tokens);
 
     return json({ tokens, count: tokens.length, generatedAt: new Date().toISOString() });
   } catch (err) {

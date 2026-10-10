@@ -6,6 +6,7 @@ import {
   fetchTokens,
   fmtUsd,
   fmtCompact,
+  fmtPct,
   spreadPct,
   rangePos,
   WatcherError,
@@ -148,7 +149,7 @@ function TickerTape({ tokens }: { tokens: Token[] | null }) {
 
 /* ---------------- tokens ---------------- */
 
-type SortKey = "symbol" | "mid" | "bid" | "ask" | "spread" | "volume" | "range";
+type SortKey = "symbol" | "mid" | "change" | "bid" | "ask" | "spread" | "volume" | "range";
 type SortDir = "asc" | "desc";
 
 function TokensTab({ feed }: { feed: Feed }) {
@@ -173,6 +174,7 @@ function TokensTab({ feed }: { feed: Feed }) {
       switch (sort.key) {
         case "symbol": return t.symbol;
         case "mid": return t.mid ?? -1;
+        case "change": return t.change24h ?? -1e9;
         case "bid": return t.bid ?? -1;
         case "ask": return t.ask ?? -1;
         case "spread": return spreadPct(t) ?? 1e9;
@@ -194,8 +196,10 @@ function TokensTab({ feed }: { feed: Feed }) {
     if (!tokens) return null;
     const spreads = tokens.map((t) => spreadPct(t)).filter((s): s is number => s != null);
     const avgSpread = spreads.length ? spreads.reduce((a, b) => a + b, 0) / spreads.length : null;
-    const halted = tokens.filter((t) => t.halted).length;
-    return { markets: tokens.length, avgSpread, halted };
+    const changes = tokens.filter((t) => t.change24h != null);
+    const gainers = changes.filter((t) => (t.change24h as number) > 0).length;
+    const hasChange = changes.length > 0;
+    return { markets: tokens.length, avgSpread, gainers, decliners: changes.length - gainers, hasChange };
   }, [tokens]);
 
   return (
@@ -204,7 +208,11 @@ function TokensTab({ feed }: { feed: Feed }) {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <StatTile label="Markets" value={stats ? String(stats.markets) : "-"} />
         <StatTile label="Avg spread" value={stats?.avgSpread != null ? `${stats.avgSpread.toFixed(2)}%` : "-"} />
-        <StatTile label="Halted" value={stats ? String(stats.halted) : "-"} />
+        <StatTile
+          label="24h movers"
+          value={stats?.hasChange ? `${stats.gainers} / ${stats.decliners}` : "-"}
+          hint={stats?.hasChange ? "up / down" : "building history"}
+        />
         <StatTile
           label="Updated"
           value={updatedAt ? updatedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "-"}
@@ -259,17 +267,19 @@ function TokensTab({ feed }: { feed: Feed }) {
                   <th className="left" style={{ width: 40 }}>#</th>
                   <SortTh label="Market" k="symbol" sort={sort} onSort={toggleSort} align="left" />
                   <SortTh label="Price" k="mid" sort={sort} onSort={toggleSort} />
-                  <SortTh label="Bid" k="bid" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
-                  <SortTh label="Ask" k="ask" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
-                  <SortTh label="Spread" k="spread" sort={sort} onSort={toggleSort} />
-                  <th className="hidden lg:table-cell" style={{ width: 150 }}>Day range</th>
-                  <SortTh label="Vol" k="volume" sort={sort} onSort={toggleSort} className="hidden sm:table-cell" />
+                  <SortTh label="24h" k="change" sort={sort} onSort={toggleSort} />
+                  <th className="hidden sm:table-cell" style={{ width: 84 }}>Trend</th>
+                  <SortTh label="Spread" k="spread" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
+                  <SortTh label="Bid" k="bid" sort={sort} onSort={toggleSort} className="hidden lg:table-cell" />
+                  <SortTh label="Ask" k="ask" sort={sort} onSort={toggleSort} className="hidden lg:table-cell" />
+                  <th className="hidden xl:table-cell" style={{ width: 150 }}>Day range</th>
+                  <SortTh label="Vol" k="volume" sort={sort} onSort={toggleSort} className="hidden md:table-cell" />
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="left py-8 text-center text-sm text-ink-soft">
+                    <td colSpan={10} className="left py-8 text-center text-sm text-ink-soft">
                       No markets match "{q}".
                     </td>
                   </tr>
@@ -342,14 +352,42 @@ function Row({ t, rank, flash, tick }: { t: Token; rank: number; flash?: "up" | 
           {fmtUsd(t.mid)}
         </span>
       </td>
-      <td className="num hidden text-ink-soft md:table-cell">{fmtUsd(t.bid)}</td>
-      <td className="num hidden text-ink-soft md:table-cell">{fmtUsd(t.ask)}</td>
-      <td className="num">{spread != null ? `${spread.toFixed(2)}%` : "-"}</td>
-      <td className="hidden lg:table-cell">
+      <td className={`num display text-sm ${t.change24h == null ? "text-ink-soft" : t.change24h >= 0 ? "text-up" : "text-down"}`}>
+        {fmtPct(t.change24h)}
+      </td>
+      <td className="hidden sm:table-cell">
+        <div className="flex justify-end">
+          <Sparkline data={t.spark} up={t.change24h == null ? null : t.change24h >= 0} />
+        </div>
+      </td>
+      <td className="num hidden md:table-cell">{spread != null ? `${spread.toFixed(2)}%` : "-"}</td>
+      <td className="num hidden text-ink-soft lg:table-cell">{fmtUsd(t.bid)}</td>
+      <td className="num hidden text-ink-soft lg:table-cell">{fmtUsd(t.ask)}</td>
+      <td className="hidden xl:table-cell">
         <DayRange t={t} />
       </td>
-      <td className="num hidden text-ink-soft sm:table-cell">{fmtCompact(t.volume)}</td>
+      <td className="num hidden text-ink-soft md:table-cell">{fmtCompact(t.volume)}</td>
     </tr>
+  );
+}
+
+function Sparkline({ data, up }: { data: number[]; up: boolean | null }) {
+  if (!data || data.length < 2) return <span className="text-[0.6rem] text-ink-soft">-</span>;
+  const w = 72, h = 22, pad = 2;
+  const min = Math.min(...data), max = Math.max(...data);
+  const span = max - min || 1;
+  const pts = data
+    .map((v, i) => {
+      const x = pad + (i / (data.length - 1)) * (w - pad * 2);
+      const y = pad + (1 - (v - min) / span) * (h - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const stroke = up == null ? "var(--color-ink-soft)" : up ? "var(--color-green)" : "var(--color-red)";
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="block" aria-hidden>
+      <polyline points={pts} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
   );
 }
 
@@ -391,7 +429,7 @@ function DayRange({ t }: { t: Token }) {
   );
 }
 
-function StatTile({ label, value, live }: { label: string; value: string; live?: boolean }) {
+function StatTile({ label, value, live, hint }: { label: string; value: string; live?: boolean; hint?: string }) {
   return (
     <div className="card-soft px-3 py-2">
       <div className="flex items-center gap-1.5 text-[0.6rem] uppercase tracking-wide text-ink-soft">
@@ -399,6 +437,7 @@ function StatTile({ label, value, live }: { label: string; value: string; live?:
         {label}
       </div>
       <div className="display mt-0.5 text-base tabular-nums">{value}</div>
+      {hint && <div className="text-[0.55rem] text-ink-soft">{hint}</div>}
     </div>
   );
 }

@@ -19,6 +19,10 @@ export interface Token {
   contractAddress: string | null;
   chainId: number | null;
   generatedAt: string | null;
+  /** Percent change over the last 24h (null until history accrues). */
+  change24h: number | null;
+  /** Downsampled intraday mids for the row sparkline. */
+  spark: number[];
 }
 
 export interface TokensResponse {
@@ -71,6 +75,13 @@ export function fmtUsd(v: number | null): string {
 export function fmtCompact(v: number | null): string {
   if (v == null) return DASH;
   return v.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 });
+}
+
+/** Signed percent, e.g. "+1.24%" / "-0.80%". */
+export function fmtPct(v: number | null): string {
+  if (v == null) return DASH;
+  const sign = v > 0 ? "+" : "";
+  return `${sign}${v.toFixed(2)}%`;
 }
 
 /** Spread as a percent of mid, a rough liquidity tell. */
