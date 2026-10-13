@@ -52,8 +52,13 @@ export interface InviteRow {
 export async function attributeReferral(userId: string, myHandle: string | null) {
   if (!supabase) return;
   const ref = getRef();
-  if (!ref) return;
+  const log = (...a: unknown[]) => console.log("[referral]", ...a);
+  if (!ref) {
+    log("no pending referral code; nothing to attribute");
+    return;
+  }
   if (myHandle && ref.toLowerCase() === myHandle.toLowerCase()) {
+    log("self-referral ignored", { ref, myHandle });
     clearRef();
     return;
   }
@@ -64,17 +69,45 @@ export async function attributeReferral(userId: string, myHandle: string | null)
       .eq("referred_user_id", userId)
       .maybeSingle();
     if (existing) {
+      log("already attributed; keeping existing");
       clearRef();
       return;
     }
-    const { data: referrerId } = await supabase.rpc("resolve_referrer", { handle: ref });
-    if (referrerId && referrerId !== userId) {
-      await supabase
+
+    const { data: referrerId, error: resolveErr } = await supabase.rpc("resolve_referrer", { handle: ref });
+    if (resolveErr) {
+      log("resolve_referrer error", resolveErr.message);
+      return; // keep ref so a later load can retry
+    }
+    if (!referrerId) {
+      log("no inviter matches handle; clearing", { ref });
+      clearRef();
+      return;
+    }
+    if (referrerId === userId) {
+      clearRef();
+      return;
+    }
+
+    const { error: insErr } = await supabase
+      .from("referrals")
+      .insert({ referrer_id: referrerId, referred_user_id: userId, status: "connected" });
+    if (insErr) {
+      // A fresh signup can race the profile-creation trigger; retry once.
+      log("insert failed, retrying once", insErr.message);
+      await new Promise((r) => setTimeout(r, 800));
+      const { error: retryErr } = await supabase
         .from("referrals")
         .insert({ referrer_id: referrerId, referred_user_id: userId, status: "connected" });
+      if (retryErr) {
+        log("insert failed again; keeping ref for next load", retryErr.message);
+        return; // don't clear, so onAuthStateChange / next visit can retry
+      }
     }
-  } catch {
-    /* best-effort attribution */
+    log("attributed ✓", { referredBy: ref });
+  } catch (e) {
+    log("unexpected error", e);
+    return; // keep ref for a retry
   }
   clearRef();
 }
