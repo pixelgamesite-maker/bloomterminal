@@ -24,36 +24,32 @@ Deno.serve(async () => {
     const { data: profiles, count: pc } = await sb
       .from("profiles")
       .select("id, x_username, x_user_id, wallet_verified", { count: "exact" })
-      .limit(8);
+      .limit(50);
     out.profilesCount = pc;
-    out.profilesWithUsername = (profiles ?? []).filter((p) => p.x_username).length;
-    out.profileSample = (profiles ?? []).map((p) => ({
-      username: mask(p.x_username),
-      hasXUserId: Boolean(p.x_user_id),
-      walletVerified: p.wallet_verified,
-    }));
+    const byId = new Map((profiles ?? []).map((p) => [p.id as string, p]));
 
+    // Auth users vs profiles: an auth user with no profile = FK error source.
+    const { data: authData } = await sb.auth.admin.listUsers({ perPage: 100 });
+    const authUsers = authData?.users ?? [];
+    out.authUsersCount = authUsers.length;
+    out.authUsersMissingProfile = authUsers
+      .filter((u) => !byId.has(u.id))
+      .map((u) => ({ username: mask((u.user_metadata?.user_name as string) ?? null) }));
+
+    // Referrals WITH direction (masked handles).
     const { data: refs, count: rc } = await sb
       .from("referrals")
       .select("referrer_id, referred_user_id, status, created_at", { count: "exact" })
       .order("created_at", { ascending: false })
-      .limit(8);
+      .limit(20);
     out.referralsCount = rc;
-    out.referralSample = (refs ?? []).map((r) => ({
+    out.referrals = (refs ?? []).map((r) => ({
+      referrer: mask((byId.get(r.referrer_id as string)?.x_username as string) ?? null),
+      referred: mask((byId.get(r.referred_user_id as string)?.x_username as string) ?? null),
+      referrerHasProfile: byId.has(r.referrer_id as string),
+      referredHasProfile: byId.has(r.referred_user_id as string),
       status: r.status,
-      hasReferrer: Boolean(r.referrer_id),
-      hasReferred: Boolean(r.referred_user_id),
-      selfReferral: r.referrer_id === r.referred_user_id,
     }));
-
-    // Does resolve_referrer find anyone for the first real username?
-    const firstUser = (profiles ?? []).find((p) => p.x_username)?.x_username ?? null;
-    if (firstUser) {
-      const { data: resolved, error } = await sb.rpc("resolve_referrer", { handle: firstUser });
-      out.resolveTest = { input: mask(firstUser), resolvedToSomeId: Boolean(resolved), error: error?.message ?? null };
-    } else {
-      out.resolveTest = "no username to test";
-    }
   } catch (err) {
     out.error = String(err);
   }

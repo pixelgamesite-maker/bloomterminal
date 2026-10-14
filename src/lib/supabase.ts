@@ -49,7 +49,7 @@ export interface InviteRow {
  * inviter's id from their handle and insert a row into `referrals`.
  * Safe to call on every sign-in, it no-ops if already attributed.
  */
-export async function attributeReferral(userId: string, myHandle: string | null) {
+export async function attributeReferral(_userId: string, myHandle: string | null) {
   if (!supabase) return;
   const ref = getRef();
   const log = (...a: unknown[]) => console.log("[referral]", ...a);
@@ -63,48 +63,18 @@ export async function attributeReferral(userId: string, myHandle: string | null)
     return;
   }
   try {
-    const { data: existing } = await supabase
-      .from("referrals")
-      .select("id")
-      .eq("referred_user_id", userId)
-      .maybeSingle();
-    if (existing) {
-      log("already attributed; keeping existing");
-      clearRef();
-      return;
-    }
-
-    const { data: referrerId, error: resolveErr } = await supabase.rpc("resolve_referrer", { handle: ref });
-    if (resolveErr) {
-      log("resolve_referrer error", resolveErr.message);
+    const { data, error } = await supabase.rpc("link_referral", { code: ref });
+    if (error) {
+      log("link_referral error; keeping ref for retry", error.message);
       return; // keep ref so a later load can retry
     }
-    if (!referrerId) {
-      log("no inviter matches handle; clearing", { ref });
-      clearRef();
-      return;
+    const res = (data ?? {}) as { ok: boolean; error?: string };
+    if (res.ok) {
+      log("attributed ✓", { referredBy: ref });
+    } else {
+      log("not attributed", res.error);
+      // "already linked" / "own code" / "no such code" are terminal, stop retrying.
     }
-    if (referrerId === userId) {
-      clearRef();
-      return;
-    }
-
-    const { error: insErr } = await supabase
-      .from("referrals")
-      .insert({ referrer_id: referrerId, referred_user_id: userId, status: "connected" });
-    if (insErr) {
-      // A fresh signup can race the profile-creation trigger; retry once.
-      log("insert failed, retrying once", insErr.message);
-      await new Promise((r) => setTimeout(r, 800));
-      const { error: retryErr } = await supabase
-        .from("referrals")
-        .insert({ referrer_id: referrerId, referred_user_id: userId, status: "connected" });
-      if (retryErr) {
-        log("insert failed again; keeping ref for next load", retryErr.message);
-        return; // don't clear, so onAuthStateChange / next visit can retry
-      }
-    }
-    log("attributed ✓", { referredBy: ref });
   } catch (e) {
     log("unexpected error", e);
     return; // keep ref for a retry
@@ -129,35 +99,21 @@ export async function loadReferredBy(userId: string): Promise<string | null> {
  * link / localStorage needed). The code is the inviter's handle.
  */
 export async function submitReferralCode(
-  userId: string,
+  _userId: string,
   code: string,
-  myHandle: string | null
+  _myHandle: string | null
 ): Promise<{ ok: boolean; error?: string; inviter?: string }> {
   if (!supabase) return { ok: false, error: "Not connected." };
   const ref = code.replace(/^@/, "").trim();
   if (!ref) return { ok: false, error: "Enter a code." };
-  if (myHandle && ref.toLowerCase() === myHandle.toLowerCase()) {
-    return { ok: false, error: "You can't use your own code." };
-  }
   try {
-    const { data: existing } = await supabase
-      .from("referrals")
-      .select("id")
-      .eq("referred_user_id", userId)
-      .maybeSingle();
-    if (existing) return { ok: false, error: "You're already linked to an inviter." };
-
-    const { data: referrerId, error: resolveErr } = await supabase.rpc("resolve_referrer", { handle: ref });
-    if (resolveErr) return { ok: false, error: resolveErr.message };
-    if (!referrerId) return { ok: false, error: "No terminal uses that code." };
-    if (referrerId === userId) return { ok: false, error: "You can't use your own code." };
-
-    const { error: insErr } = await supabase
-      .from("referrals")
-      .insert({ referrer_id: referrerId, referred_user_id: userId, status: "connected" });
-    if (insErr) return { ok: false, error: insErr.message };
-    clearRef();
-    return { ok: true, inviter: ref };
+    // One trusted call: ensures our profile exists, sets direction from
+    // auth.uid(), inserts the referral. Avoids the FK error and reversal.
+    const { data, error } = await supabase.rpc("link_referral", { code: ref });
+    if (error) return { ok: false, error: error.message };
+    const res = (data ?? {}) as { ok: boolean; error?: string; inviter?: string };
+    if (res.ok) clearRef();
+    return res;
   } catch (e) {
     return { ok: false, error: String(e) };
   }
