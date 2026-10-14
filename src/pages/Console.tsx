@@ -12,6 +12,7 @@ import { StatusDot } from "@/components/StatusDot";
 import { WORKER_CLASSES, MARKET_KINDS, assetsForKind } from "@/lib/catalog";
 import { CLASS_ART, LOGO } from "@/lib/art";
 import { ECONOMY, BRAND } from "@/lib/config";
+import { getRef } from "@/lib/referral";
 import type { MarketKind, WorkerClass } from "@/lib/types";
 import { cn, duration } from "@/lib/utils";
 
@@ -327,8 +328,9 @@ function TasksTab({ setTab }: { setTab: (t: Tab) => void }) {
 
 function InvitesTab() {
   const t = useTerminal();
-  const [copied, setCopied] = useState(false);
-  const link = `${BRAND.joinBase}/${(t.handle ?? "you").toUpperCase()}`;
+  const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  const code = (t.handle ?? "you").toUpperCase();
+  const link = `${BRAND.joinBase}/${code}`;
 
   // Pull the latest referred-friends list when the tab opens.
   useEffect(() => {
@@ -336,10 +338,10 @@ function InvitesTab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function copy() {
-    navigator.clipboard?.writeText(link).catch(() => {});
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1400);
+  function copy(which: "code" | "link") {
+    navigator.clipboard?.writeText(which === "code" ? code : link).catch(() => {});
+    setCopied(which);
+    setTimeout(() => setCopied(null), 1400);
   }
 
   return (
@@ -347,17 +349,32 @@ function InvitesTab() {
       <div className="text-center">
         <h2 className="display text-xl">Invite {ECONOMY.requiredAgents} friends</h2>
         <p className="mt-1 text-sm text-ink-soft">
-          Share your link. A friend counts once they sign in and bind a wallet.
+          Share your code. A friend counts once they enter it and bind a wallet.
         </p>
       </div>
 
-      <div className="flex items-center gap-2">
-        <code className="flex-1 truncate rounded-lg border-2 border-ink bg-screen-2 px-3 py-2 text-sm">
-          {link}
-        </code>
-        <Button size="sm" onClick={copy}>
-          {copied ? <Check size={15} /> : <Copy size={15} />}
-        </Button>
+      {/* were you invited? enter a code (the reliable path) */}
+      <ReferredByCard />
+
+      {/* your code to share */}
+      <div className="card-soft p-3">
+        <div className="pixel text-[0.55rem] text-ink-soft">YOUR CODE</div>
+        <div className="mt-1 flex items-center gap-2">
+          <code className="display flex-1 truncate rounded-lg border-2 border-ink bg-screen px-3 py-2 text-base">
+            {code}
+          </code>
+          <Button size="sm" onClick={() => copy("code")}>
+            {copied === "code" ? <Check size={15} /> : <Copy size={15} />}
+          </Button>
+        </div>
+        <div className="mt-2 flex items-center gap-2">
+          <code className="flex-1 truncate rounded-lg border-2 border-ink bg-screen-2 px-3 py-1.5 text-xs text-ink-soft">
+            {link}
+          </code>
+          <Button size="sm" onClick={() => copy("link")}>
+            {copied === "link" ? <Check size={15} /> : <Copy size={15} />}
+          </Button>
+        </div>
       </div>
 
       <div className="flex items-center justify-between">
@@ -385,6 +402,51 @@ function InvitesTab() {
           ))
         )}
       </div>
+    </div>
+  );
+}
+
+function ReferredByCard() {
+  const t = useTerminal();
+  const [code, setCode] = useState(() => getRef() ?? "");
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  if (t.referredBy) {
+    return (
+      <div className="card-soft flex items-center gap-2 p-3">
+        <StatusDot tone="live" />
+        <span className="text-sm">
+          Invited by <span className="font-bold">@{t.referredBy}</span>
+        </span>
+        <Badge variant="green" className="ml-auto">linked</Badge>
+      </div>
+    );
+  }
+
+  async function apply() {
+    setBusy(true);
+    setMsg(null);
+    const res = await t.applyReferralCode(code);
+    setBusy(false);
+    setMsg(res.ok ? { ok: true, text: "Linked to your inviter ✓" } : { ok: false, text: res.error ?? "Couldn't apply that code." });
+  }
+
+  return (
+    <div className="card-soft p-3">
+      <div className="pixel text-[0.55rem] text-ink-soft">INVITED BY SOMEONE?</div>
+      <div className="mt-1 flex items-center gap-2">
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          placeholder="Enter their code"
+          className="w-full rounded-lg border-2 border-ink bg-screen px-3 py-2 text-sm font-semibold uppercase outline-none placeholder:normal-case placeholder:text-ink-soft focus:ring-2 focus:ring-pink"
+        />
+        <Button size="sm" variant="pink" disabled={busy || !code.trim()} onClick={apply}>
+          Apply
+        </Button>
+      </div>
+      {msg && <p className={cn("mt-1.5 text-xs", msg.ok ? "text-green" : "text-red")}>{msg.text}</p>}
     </div>
   );
 }

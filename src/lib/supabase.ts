@@ -112,6 +112,57 @@ export async function attributeReferral(userId: string, myHandle: string | null)
   clearRef();
 }
 
+/** The handle of whoever referred this user, or null if not referred. */
+export async function loadReferredBy(userId: string): Promise<string | null> {
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from("referrals")
+    .select("referrer:profiles!referrals_referrer_id_fkey ( x_username )")
+    .eq("referred_user_id", userId)
+    .maybeSingle();
+  const row = data as { referrer: { x_username: string | null } | null } | null;
+  return row?.referrer?.x_username ?? null;
+}
+
+/**
+ * Attribute a referral from a code the user TYPED IN (the reliable path, no
+ * link / localStorage needed). The code is the inviter's handle.
+ */
+export async function submitReferralCode(
+  userId: string,
+  code: string,
+  myHandle: string | null
+): Promise<{ ok: boolean; error?: string; inviter?: string }> {
+  if (!supabase) return { ok: false, error: "Not connected." };
+  const ref = code.replace(/^@/, "").trim();
+  if (!ref) return { ok: false, error: "Enter a code." };
+  if (myHandle && ref.toLowerCase() === myHandle.toLowerCase()) {
+    return { ok: false, error: "You can't use your own code." };
+  }
+  try {
+    const { data: existing } = await supabase
+      .from("referrals")
+      .select("id")
+      .eq("referred_user_id", userId)
+      .maybeSingle();
+    if (existing) return { ok: false, error: "You're already linked to an inviter." };
+
+    const { data: referrerId, error: resolveErr } = await supabase.rpc("resolve_referrer", { handle: ref });
+    if (resolveErr) return { ok: false, error: resolveErr.message };
+    if (!referrerId) return { ok: false, error: "No terminal uses that code." };
+    if (referrerId === userId) return { ok: false, error: "You can't use your own code." };
+
+    const { error: insErr } = await supabase
+      .from("referrals")
+      .insert({ referrer_id: referrerId, referred_user_id: userId, status: "connected" });
+    if (insErr) return { ok: false, error: insErr.message };
+    clearRef();
+    return { ok: true, inviter: ref };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
 /** The people this user referred, with whether they've bound a wallet / are eligible. */
 export async function loadInvites(userId: string): Promise<InviteRow[]> {
   if (!supabase) return [];

@@ -22,6 +22,8 @@ import {
   loadProfile,
   attributeReferral,
   loadInvites,
+  loadReferredBy,
+  submitReferralCode,
   pushEligibility,
   type InviteRow,
 } from "@/lib/supabase";
@@ -45,6 +47,8 @@ interface TerminalState {
   missions: Mission[];
   /** Real referred friends, loaded from Supabase. */
   invites: InviteRow[];
+  /** Handle of whoever referred this user (null if not referred). */
+  referredBy: string | null;
   worker: Worker | null;
   nftMinted: boolean;
   claimedTotal: number;
@@ -70,6 +74,8 @@ interface TerminalValue extends TerminalState {
   completeMission: (id: string) => void;
   /** Re-fetch the real referred-friends list from Supabase. */
   refreshInvites: () => void;
+  /** Attribute a referral from a typed code (the inviter's handle). */
+  applyReferralCode: (code: string) => Promise<{ ok: boolean; error?: string }>;
   createWorker: (cfg: {
     cls: WorkerClass;
     kind: MarketKind;
@@ -96,12 +102,15 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     address: null,
     missions: INITIAL_MISSIONS,
     invites: [],
+    referredBy: null,
     worker: null,
     nftMinted: false,
     claimedTotal: 0,
   });
 
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   // Real X auth via Supabase: hydrate from the session, then keep in sync.
   useEffect(() => {
@@ -133,10 +142,10 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         address: profile?.wallet_address ?? s.address,
       }));
 
-      // Attribute any pending referral, then load the real referred list.
+      // Attribute any pending referral, then load the real lists.
       await attributeReferral(userId, handle);
-      const invites = await loadInvites(userId);
-      setState((s) => ({ ...s, invites }));
+      const [invites, referredBy] = await Promise.all([loadInvites(userId), loadReferredBy(userId)]);
+      setState((s) => ({ ...s, invites, referredBy }));
     }
 
     supabase.auth.getSession().then(({ data }) => {
@@ -234,6 +243,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       address: null,
       missions: INITIAL_MISSIONS,
       invites: [],
+      referredBy: null,
       worker: null,
       nftMinted: false,
       claimedTotal: 0,
@@ -252,6 +262,17 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       if (supabase && s.userId) loadInvites(s.userId).then((invites) => setState((p) => ({ ...p, invites })));
       return s;
     });
+  }, []);
+
+  const applyReferralCode = useCallback(async (code: string) => {
+    const uid = stateRef.current.userId;
+    if (!uid) return { ok: false, error: "Sign in first." };
+    const res = await submitReferralCode(uid, code, stateRef.current.handle);
+    if (res.ok) {
+      const referredBy = await loadReferredBy(uid);
+      setState((s) => ({ ...s, referredBy }));
+    }
+    return { ok: res.ok, error: res.error };
   }, []);
 
   const createWorker = useCallback(
@@ -349,6 +370,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       signOut,
       completeMission,
       refreshInvites,
+      applyReferralCode,
       createWorker,
       deployWorker,
       pauseWorker,
@@ -364,6 +386,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     signOut,
     completeMission,
     refreshInvites,
+    applyReferralCode,
     createWorker,
     deployWorker,
     pauseWorker,
