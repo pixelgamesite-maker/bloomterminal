@@ -25,6 +25,10 @@ import {
   loadReferredBy,
   submitReferralCode,
   pushEligibility,
+  saveCompletedTasks,
+  loadWorker,
+  insertWorker,
+  updateWorkerStatus,
   type InviteRow,
 } from "@/lib/supabase";
 import { captureRefFromUrl } from "@/lib/referral";
@@ -122,7 +126,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, xConnected: false, userId: null, handle: null, avatar: null, authLoading: false }));
         return;
       }
-      const profile = await loadProfile(userId);
+      const [profile, worker] = await Promise.all([loadProfile(userId), loadWorker(userId)]);
       const handle =
         profile?.x_username ??
         (meta?.user_name as string) ??
@@ -131,6 +135,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       const avatar =
         profile?.x_profile_image ??
         ((meta?.avatar_url as string) || (meta?.picture as string) || null);
+      const completed = profile?.completed_tasks ?? [];
       setState((s) => ({
         ...s,
         xConnected: true,
@@ -140,6 +145,9 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         avatar: avatar ? avatar.replace("_normal", "_400x400") : null,
         walletConnected: Boolean(profile?.wallet_address && profile?.wallet_verified) || s.walletConnected,
         address: profile?.wallet_address ?? s.address,
+        // Restore saved progress so tasks + agent don't reappear on refresh.
+        missions: s.missions.map((m) => (completed.includes(m.id) ? { ...m, done: true } : m)),
+        worker: worker ?? s.worker,
       }));
 
       // Attribute any pending referral, then load the real lists.
@@ -252,10 +260,18 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const completeMission = useCallback((id: string) => {
-    setState((s) => ({
-      ...s,
-      missions: s.missions.map((m) => (m.id === id ? { ...m, done: true } : m)),
-    }));
+    setState((s) => {
+      const missions = s.missions.map((m) => (m.id === id ? { ...m, done: true } : m));
+      if (supabase && s.userId) {
+        // Persist the manually-completed tasks (bind-wallet/invite-agents are
+        // derived from wallet + referrals, which persist on their own).
+        const keys = missions
+          .filter((m) => m.done && m.id !== "bind-wallet" && m.id !== "invite-agents")
+          .map((m) => m.id);
+        saveCompletedTasks(s.userId, keys);
+      }
+      return { ...s, missions };
+    });
   }, []);
 
   const refreshInvites = useCallback(() => {
@@ -279,12 +295,13 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const createWorker = useCallback(
     (cfg: { cls: WorkerClass; kind: MarketKind; asset: string }) => {
       const info = WORKER_CLASSES.find((c) => c.id === cfg.cls);
+      const name = (info?.label ?? "Agent").toUpperCase();
       // Picking an agent is one-time and starts it working immediately.
       setState((s) => ({
         ...s,
         worker: {
           id: crypto.randomUUID(),
-          name: (info?.label ?? "Agent").toUpperCase(),
+          name,
           class: cfg.cls,
           kind: cfg.kind,
           asset: cfg.asset,
@@ -294,6 +311,13 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
           baseEarned: 0,
         },
       }));
+      // Persist so the choice sticks across refresh/sign-in.
+      const uid = stateRef.current.userId;
+      if (supabase && uid) {
+        insertWorker(uid, { name, cls: cfg.cls, kind: cfg.kind, asset: cfg.asset }).then((id) => {
+          if (id) setState((s) => (s.worker ? { ...s, worker: { ...s.worker, id } } : s));
+        });
+      }
     },
     []
   );
@@ -307,19 +331,23 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const pauseWorker = useCallback(() => {
-    setState((s) =>
-      s.worker && s.worker.status === "active"
-        ? { ...s, worker: { ...s.worker, status: "paused" } }
-        : s
-    );
+    setState((s) => {
+      if (s.worker && s.worker.status === "active") {
+        if (supabase) updateWorkerStatus(s.worker.id, "paused");
+        return { ...s, worker: { ...s.worker, status: "paused" } };
+      }
+      return s;
+    });
   }, []);
 
   const resumeWorker = useCallback(() => {
-    setState((s) =>
-      s.worker && s.worker.status === "paused"
-        ? { ...s, worker: { ...s.worker, status: "active" } }
-        : s
-    );
+    setState((s) => {
+      if (s.worker && s.worker.status === "paused") {
+        if (supabase) updateWorkerStatus(s.worker.id, "active");
+        return { ...s, worker: { ...s.worker, status: "active" } };
+      }
+      return s;
+    });
   }, []);
 
   const mint = useCallback(() => {

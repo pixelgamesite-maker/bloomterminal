@@ -25,6 +25,7 @@ export interface ProfileRow {
   wallet_address: string | null;
   wallet_verified: boolean;
   eligibility_status: "pending" | "eligible";
+  completed_tasks: string[] | null;
 }
 
 /** Load the signed-in user's profile row (created by the handle_new_user trigger). */
@@ -32,10 +33,95 @@ export async function loadProfile(userId: string): Promise<ProfileRow | null> {
   if (!supabase) return null;
   const { data } = await supabase
     .from("profiles")
-    .select("id, x_username, x_profile_image, wallet_address, wallet_verified, eligibility_status")
+    .select("id, x_username, x_profile_image, wallet_address, wallet_verified, eligibility_status, completed_tasks")
     .eq("id", userId)
     .maybeSingle();
   return (data as ProfileRow) ?? null;
+}
+
+/** Persist the set of completed task keys (social tasks) to the profile. */
+export async function saveCompletedTasks(userId: string, keys: string[]) {
+  if (!supabase) return;
+  try {
+    await supabase.from("profiles").update({ completed_tasks: keys }).eq("id", userId);
+  } catch {
+    /* best-effort */
+  }
+}
+
+// --- Worker (agent) persistence ---
+import type { MarketKind, Worker, WorkerClass, WorkerStatus } from "./types";
+
+interface WorkerRow {
+  id: string;
+  name: string;
+  class: WorkerClass;
+  category: string;
+  asset: string;
+  status: WorkerStatus;
+  base_earned: number;
+  created_at: string;
+  deployed_at: string | null;
+}
+
+function rowToWorker(r: WorkerRow): Worker {
+  return {
+    id: r.id,
+    name: r.name,
+    class: r.class,
+    kind: r.category as MarketKind,
+    asset: r.asset,
+    status: r.status,
+    createdAt: Date.parse(r.created_at) || Date.now(),
+    deployedAt: r.deployed_at ? Date.parse(r.deployed_at) : null,
+    baseEarned: Number(r.base_earned) || 0,
+  };
+}
+
+/** The user's agent, if they've already picked one (one-time, locked). */
+export async function loadWorker(userId: string): Promise<Worker | null> {
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from("workers")
+    .select("id, name, class, category, asset, status, base_earned, created_at, deployed_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data ? rowToWorker(data as WorkerRow) : null;
+}
+
+/** Persist a newly chosen agent; returns the stored id (or null on failure). */
+export async function insertWorker(
+  userId: string,
+  w: { name: string; cls: WorkerClass; kind: MarketKind; asset: string }
+): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("workers")
+    .insert({
+      user_id: userId,
+      name: w.name,
+      class: w.cls,
+      category: w.kind,
+      asset: w.asset,
+      status: "active",
+      deployed_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  if (error) return null;
+  return (data as { id: string }).id;
+}
+
+/** Update an agent's run status (active/paused). */
+export async function updateWorkerStatus(workerId: string, status: WorkerStatus) {
+  if (!supabase) return;
+  try {
+    await supabase.from("workers").update({ status }).eq("id", workerId);
+  } catch {
+    /* best-effort */
+  }
 }
 
 export interface InviteRow {
