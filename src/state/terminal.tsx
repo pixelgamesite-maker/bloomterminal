@@ -163,7 +163,8 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   // real referred friends who have bound a wallet.
   useEffect(() => {
     setState((s) => {
-      const activeAgents = s.invites.filter((i) => i.walletVerified).length;
+      // A referral counts as soon as the friend enters the code (wallet or not).
+      const activeAgents = s.invites.length;
       const missions = s.missions.map((m) => {
         if (m.id === "bind-wallet") return { ...m, done: s.walletConnected };
         if (m.id === "invite-agents")
@@ -184,7 +185,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   const lastEligible = useRef<boolean | null>(null);
   useEffect(() => {
     if (!supabase || !state.userId) return;
-    const activeAgents = state.invites.filter((i) => i.walletVerified).length;
+    const activeAgents = state.invites.length;
     const eligible =
       state.walletConnected &&
       state.missions.every((m) => m.done) &&
@@ -338,7 +339,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<TerminalValue>(() => {
-    const activeAgents = state.invites.filter((i) => i.walletVerified).length;
+    const activeAgents = state.invites.length;
     const missionsComplete = state.missions.every((m) => m.done);
     const eligible =
       state.xConnected &&

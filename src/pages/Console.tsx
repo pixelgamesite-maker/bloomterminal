@@ -349,7 +349,7 @@ function InvitesTab() {
       <div className="text-center">
         <h2 className="display text-xl">Invite {ECONOMY.requiredAgents} friends</h2>
         <p className="mt-1 text-sm text-ink-soft">
-          Share your code. A friend counts once they enter it and bind a wallet.
+          Share your code. A friend counts the moment they enter it, no wallet needed.
         </p>
       </div>
 
@@ -393,10 +393,10 @@ function InvitesTab() {
         ) : (
           t.invites.map((i, idx) => (
             <div key={idx} className="card-soft flex items-center gap-3 p-2.5">
-              <StatusDot tone={i.walletVerified ? "live" : "idle"} />
+              <StatusDot tone="live" />
               <span className="flex-1 font-bold">@{i.handle}</span>
-              <Badge variant={i.walletVerified ? "green" : "muted"}>
-                {i.eligible ? "eligible" : i.walletVerified ? "active" : "joined"}
+              <Badge variant={i.walletVerified ? "green" : "blue"}>
+                {i.walletVerified ? "wallet set" : "counted"}
               </Badge>
             </div>
           ))
