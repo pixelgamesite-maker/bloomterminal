@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Copy, Check, Lock, ExternalLink, Pause, Play, RotateCw } from "lucide-react";
 import { useTerminal } from "@/state/terminal";
 import { ProfileMenu } from "@/components/ProfileMenu";
+import { Menu } from "@/components/Menu";
+import { ComingSoonModal } from "@/components/ComingSoonModal";
 import { TvArt } from "@/components/TvArt";
 import { BindWalletModal } from "@/components/BindWalletModal";
 import { Button } from "@/components/ui/button";
@@ -27,16 +30,23 @@ const TABS: { id: Tab; label: string }[] = [
 
 export default function Console() {
   const [tab, setTab] = useState<Tab>("agent");
+  const [soon, setSoon] = useState<{ title: string; blurb: string; art: string } | null>(null);
 
   return (
     <div className="mx-auto max-w-2xl px-5 py-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <img src={LOGO} className="pixel h-7 w-7 rounded-md" alt="" />
-          <span className="pixel text-xs">BLOOM</span>
+          <Menu onComingSoon={(title, blurb, art) => setSoon({ title, blurb, art })} />
+          <Link to="/" className="flex items-center gap-2">
+            <img src={LOGO} className="pixel h-7 w-7 rounded-md" alt="" />
+            <span className="pixel text-xs">BLOOM</span>
+          </Link>
         </div>
         <ProfileMenu />
       </div>
+      {soon && (
+        <ComingSoonModal title={soon.title} blurb={soon.blurb} art={soon.art} onClose={() => setSoon(null)} />
+      )}
 
       <div className="mt-5 flex justify-center">
         <div className="tabs">

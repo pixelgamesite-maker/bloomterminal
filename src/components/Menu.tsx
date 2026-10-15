@@ -13,13 +13,15 @@ interface Item {
   onClick: () => void;
 }
 
-/** The site hamburger menu for public pages. */
+/** The site hamburger menu, used on public pages and inside the console. */
 export function Menu({
   onRegister,
   onComingSoon,
+  registerLabel = "Register a Worker",
 }: {
-  onRegister: () => void;
+  onRegister?: () => void;
   onComingSoon: (title: string, blurb: string, art: string) => void;
+  registerLabel?: string;
 }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -97,9 +99,11 @@ export function Menu({
               ))}
             </nav>
 
-            <Button variant="pink" className="mt-4 w-full" onClick={go(onRegister)}>
-              Register a Worker
-            </Button>
+            {onRegister && (
+              <Button variant="pink" className="mt-4 w-full" onClick={go(onRegister)}>
+                {registerLabel}
+              </Button>
+            )}
           </div>
         </div>
       )}

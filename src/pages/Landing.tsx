@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Eye, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,8 +20,7 @@ export default function Landing() {
   const [signingIn, setSigningIn] = useState(false);
   const [soon, setSoon] = useState<Soon | null>(null);
   const openSoon = (title: string, blurb: string, art: string) => setSoon({ title, blurb, art });
-
-  if (!authLoading && xConnected) return <Navigate to="/app" replace />;
+  const signedIn = !authLoading && xConnected;
 
   return (
     <div className="relative min-h-full">
@@ -30,11 +29,15 @@ export default function Landing() {
       <div className="relative z-10 mx-auto max-w-3xl px-5 pb-10">
         {/* top bar */}
         <div className="flex items-center justify-between py-4">
-          <Menu onRegister={() => setSigningIn(true)} onComingSoon={openSoon} />
-          <div className="flex items-center gap-2">
+          <Menu
+            onRegister={signedIn ? () => navigate("/app") : () => setSigningIn(true)}
+            registerLabel={signedIn ? "Open Console" : "Register a Worker"}
+            onComingSoon={openSoon}
+          />
+          <Link to="/" className="flex items-center gap-2">
             <img src={LOGO} className="pixel h-7 w-7 rounded-md" alt="" />
             <span className="pixel text-xs">BLOOM</span>
-          </div>
+          </Link>
         </div>
 
         {/* hero */}
@@ -62,16 +65,17 @@ export default function Landing() {
             >
               <Eye size={18} className="mr-2" /> Open the Watcher
             </Button>
-            <Button
-              variant="pink"
-              size="lg"
-              className="w-full max-w-xs"
-              onClick={() => setSigningIn(true)}
-            >
-              Register a Worker
-            </Button>
+            {signedIn ? (
+              <Button variant="pink" size="lg" className="w-full max-w-xs" onClick={() => navigate("/app")}>
+                Open Console
+              </Button>
+            ) : (
+              <Button variant="pink" size="lg" className="w-full max-w-xs" onClick={() => setSigningIn(true)}>
+                Register a Worker
+              </Button>
+            )}
             <span className="text-[0.65rem] text-ink-soft">
-              Watcher is public · registering needs X
+              {signedIn ? "You're signed in" : "Watcher is public · registering needs X"}
             </span>
           </div>
         </div>
