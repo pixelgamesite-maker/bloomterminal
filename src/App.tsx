@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import Landing from "@/pages/Landing";
 import Console from "@/pages/Console";
 import Watcher from "@/pages/Watcher";
+import Rental from "@/pages/Rental";
 import Join from "@/pages/Join";
 import { LOGO } from "@/lib/art";
 
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/join/:code" element={<Join />} />
             {/* Public, no X auth needed */}
             <Route path="/watcher" element={<Watcher />} />
+            <Route path="/rental" element={<Rental />} />
             <Route
               path="/app"
               element={

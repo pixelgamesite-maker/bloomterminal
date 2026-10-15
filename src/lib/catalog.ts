@@ -75,12 +75,12 @@ export const X_HANDLE = "BloomTerminall";
 export const X_URL = "https://x.com/BloomTerminall";
 export const X_POST_URL = "https://x.com/BloomTerminall/status/2104587590141669530";
 
-// One-time tasks.
+// One-time tasks (order matters; bind-wallet is gated until the rest are done).
 export const INITIAL_MISSIONS: Mission[] = [
   {
     id: "follow",
-    title: "Follow @BloomTerminall",
-    description: "Follow the account on X.",
+    title: "Follow Bloomterminal",
+    description: "Follow @BloomTerminall on X.",
     type: "social",
     reward: 50,
     done: false,
@@ -88,9 +88,9 @@ export const INITIAL_MISSIONS: Mission[] = [
     link: X_URL,
   },
   {
-    id: "repost",
-    title: "Repost the announcement",
-    description: "Share the launch post.",
+    id: "quote",
+    title: "Quote the pinned post",
+    description: "Quote the pinned post on X.",
     type: "social",
     reward: 50,
     done: false,
@@ -99,28 +99,28 @@ export const INITIAL_MISSIONS: Mission[] = [
   },
   {
     id: "comment",
-    title: "Comment on the post",
-    description: "Leave a comment to verify.",
+    title: "Comment and tag 2 frens",
+    description: "Comment on the post and tag two friends.",
     type: "social",
-    reward: 25,
+    reward: 50,
     done: false,
     external: true,
     link: X_POST_URL,
   },
   {
-    id: "bind-wallet",
-    title: "Bind your wallet",
-    description: "Add a valid EVM address for rewards.",
-    type: "onchain",
-    reward: 100,
+    id: "invite-agents",
+    title: "Invite 2 frens",
+    description: "Bring two people who enter your code.",
+    type: "network",
+    reward: 150,
     done: false,
   },
   {
-    id: "invite-agents",
-    title: "Invite 2 friends",
-    description: "Bring two people who stay active.",
-    type: "network",
-    reward: 150,
+    id: "bind-wallet",
+    title: "Bind wallet",
+    description: "Add a valid EVM address for rewards.",
+    type: "onchain",
+    reward: 100,
     done: false,
   },
 ];
