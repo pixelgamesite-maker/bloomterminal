@@ -25,7 +25,6 @@ export interface ProfileRow {
   wallet_address: string | null;
   wallet_verified: boolean;
   eligibility_status: "pending" | "eligible";
-  completed_tasks: string[] | null;
 }
 
 /** Load the signed-in user's profile row (created by the handle_new_user trigger). */
@@ -33,17 +32,38 @@ export async function loadProfile(userId: string): Promise<ProfileRow | null> {
   if (!supabase) return null;
   const { data } = await supabase
     .from("profiles")
-    .select("id, x_username, x_profile_image, wallet_address, wallet_verified, eligibility_status, completed_tasks")
+    .select("id, x_username, x_profile_image, wallet_address, wallet_verified, eligibility_status")
     .eq("id", userId)
     .maybeSingle();
   return (data as ProfileRow) ?? null;
+}
+
+/**
+ * Load the user's completed task keys. Kept separate from loadProfile so that
+ * if the completed_tasks column hasn't been added yet, sign-in still works
+ * (it just returns [] and tasks won't persist until the column exists).
+ */
+export async function loadCompletedTasks(userId: string): Promise<string[]> {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("completed_tasks")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error) return [];
+    return ((data as { completed_tasks: string[] | null } | null)?.completed_tasks) ?? [];
+  } catch {
+    return [];
+  }
 }
 
 /** Persist the set of completed task keys (social tasks) to the profile. */
 export async function saveCompletedTasks(userId: string, keys: string[]) {
   if (!supabase) return;
   try {
-    await supabase.from("profiles").update({ completed_tasks: keys }).eq("id", userId);
+    const { error } = await supabase.from("profiles").update({ completed_tasks: keys }).eq("id", userId);
+    if (error) console.warn("[tasks] could not persist, is the completed_tasks column added?", error.message);
   } catch {
     /* best-effort */
   }

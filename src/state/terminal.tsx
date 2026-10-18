@@ -26,6 +26,7 @@ import {
   submitReferralCode,
   pushEligibility,
   saveCompletedTasks,
+  loadCompletedTasks,
   loadWorker,
   insertWorker,
   updateWorkerStatus,
@@ -126,7 +127,11 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, xConnected: false, userId: null, handle: null, avatar: null, authLoading: false }));
         return;
       }
-      const [profile, worker] = await Promise.all([loadProfile(userId), loadWorker(userId)]);
+      const [profile, worker, completed] = await Promise.all([
+        loadProfile(userId),
+        loadWorker(userId),
+        loadCompletedTasks(userId),
+      ]);
       const handle =
         profile?.x_username ??
         (meta?.user_name as string) ??
@@ -135,7 +140,6 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       const avatar =
         profile?.x_profile_image ??
         ((meta?.avatar_url as string) || (meta?.picture as string) || null);
-      const completed = profile?.completed_tasks ?? [];
       setState((s) => ({
         ...s,
         xConnected: true,

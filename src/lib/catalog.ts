@@ -73,7 +73,7 @@ export const assetsForKind = (kind: MarketKind) =>
 // The X account the social tasks point at.
 export const X_HANDLE = "BloomTerminall";
 export const X_URL = "https://x.com/BloomTerminall";
-export const X_POST_URL = "https://x.com/BloomTerminall/status/2104587590141669530";
+export const X_POST_URL = "https://x.com/bloomterminall/status/2111822332264337750";
 
 // One-time tasks (order matters; bind-wallet is gated until the rest are done).
 export const INITIAL_MISSIONS: Mission[] = [
