@@ -69,6 +69,31 @@ export async function saveCompletedTasks(userId: string, keys: string[]) {
   }
 }
 
+/** The links a user submitted for tasks (e.g. their quote / comment post URLs). */
+export async function loadTaskLinks(userId: string): Promise<Record<string, string>> {
+  if (!supabase) return {};
+  try {
+    const { data, error } = await supabase.from("profiles").select("task_links").eq("id", userId).maybeSingle();
+    if (error) return {};
+    return ((data as { task_links: Record<string, string> | null } | null)?.task_links) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/** Save the link a user submitted for a task, merged into the others. */
+export async function saveTaskLink(userId: string, taskId: string, url: string) {
+  if (!supabase) return;
+  try {
+    const current = await loadTaskLinks(userId);
+    current[taskId] = url;
+    const { error } = await supabase.from("profiles").update({ task_links: current }).eq("id", userId);
+    if (error) console.warn("[tasks] could not save link, is the task_links column added?", error.message);
+  } catch {
+    /* best-effort */
+  }
+}
+
 // --- Worker (agent) persistence ---
 import type { MarketKind, Worker, WorkerClass, WorkerStatus } from "./types";
 

@@ -276,60 +276,119 @@ function TasksTab({ setTab }: { setTab: (t: Tab) => void }) {
       </div>
 
       <div className="space-y-2.5">
-        {t.missions.map((m) => (
-          <div key={m.id} className="card-soft flex items-center gap-3 p-3">
-            <span
-              className={cn(
-                "grid h-7 w-7 flex-none place-items-center rounded-full border-2 border-ink",
-                m.done ? "bg-green text-white" : "bg-screen"
-              )}
-            >
-              {m.done ? <Check size={14} /> : ""}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate font-bold">{m.title}</div>
-              <div className="truncate text-xs text-ink-soft">
-                {m.id === "bind-wallet" && m.done && short ? (
-                  <span className="font-mono">{short}</span>
-                ) : m.id === "bind-wallet" && !othersDone ? (
-                  "Unlocks once your other tasks are done"
-                ) : (
-                  m.description
+        {t.missions.map((m) => {
+          // Quote + comment require the user to submit their post link.
+          if ((m.id === "quote" || m.id === "comment") && !m.done) {
+            return <SubmitRow key={m.id} m={m} />;
+          }
+          return (
+            <div key={m.id} className="card-soft flex items-center gap-3 p-3">
+              <span
+                className={cn(
+                  "grid h-7 w-7 flex-none place-items-center rounded-full border-2 border-ink",
+                  m.done ? "bg-green text-white" : "bg-screen"
                 )}
+              >
+                {m.done ? <Check size={14} /> : ""}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="truncate font-bold">{m.title}</div>
+                <div className="truncate text-xs text-ink-soft">
+                  {m.id === "bind-wallet" && m.done && short ? (
+                    <span className="font-mono">{short}</span>
+                  ) : m.id === "bind-wallet" && !othersDone ? (
+                    "Unlocks once your other tasks are done"
+                  ) : m.done && t.taskLinks[m.id] ? (
+                    <a href={t.taskLinks[m.id]} target="_blank" rel="noreferrer noopener" className="truncate underline">
+                      {t.taskLinks[m.id]}
+                    </a>
+                  ) : (
+                    m.description
+                  )}
+                </div>
               </div>
-            </div>
-            {m.done ? (
-              <Badge variant="green">done</Badge>
-            ) : m.id === "bind-wallet" ? (
-              othersDone ? (
-                <Button size="sm" variant="blue" onClick={() => setBinding(true)}>
-                  Bind
+              {m.done ? (
+                <Badge variant="green">done</Badge>
+              ) : m.id === "bind-wallet" ? (
+                othersDone ? (
+                  <Button size="sm" variant="blue" onClick={() => setBinding(true)}>
+                    Bind
+                  </Button>
+                ) : (
+                  <Button size="sm" disabled title="Finish the other tasks first">
+                    <Lock size={13} /> Locked
+                  </Button>
+                )
+              ) : m.id === "invite-agents" ? (
+                <Button size="sm" onClick={() => setTab("invites")}>
+                  Invite
                 </Button>
               ) : (
-                <Button size="sm" disabled title="Finish the other tasks first">
-                  <Lock size={13} /> Locked
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    if (m.link) window.open(m.link, "_blank", "noopener");
+                    t.completeMission(m.id);
+                  }}
+                >
+                  {m.external && <ExternalLink size={13} />} Verify
                 </Button>
-              )
-            ) : m.id === "invite-agents" ? (
-              <Button size="sm" onClick={() => setTab("invites")}>
-                Invite
-              </Button>
-            ) : (
-              <Button
-                size="sm"
-                onClick={() => {
-                  if (m.link) window.open(m.link, "_blank", "noopener");
-                  t.completeMission(m.id);
-                }}
-              >
-                {m.external && <ExternalLink size={13} />} Verify
-              </Button>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {binding && <BindWalletModal onClose={() => setBinding(false)} />}
+    </div>
+  );
+}
+
+function SubmitRow({ m }: { m: { id: string; title: string; description: string; link?: string } }) {
+  const t = useTerminal();
+  const [url, setUrl] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    setBusy(true);
+    setErr(null);
+    const res = await t.submitTaskLink(m.id, url);
+    setBusy(false);
+    if (!res.ok) setErr(res.error ?? "Invalid link.");
+  }
+
+  return (
+    <div className="card-soft p-3">
+      <div className="flex items-center gap-3">
+        <span className="grid h-7 w-7 flex-none place-items-center rounded-full border-2 border-ink bg-screen" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-bold">{m.title}</div>
+          <div className="truncate text-xs text-ink-soft">{m.description}</div>
+        </div>
+        {m.link && (
+          <a
+            href={m.link}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex items-center gap-1 rounded-lg border-2 border-ink bg-screen px-2.5 py-1.5 text-xs font-bold hover:bg-ink hover:text-screen"
+          >
+            <ExternalLink size={13} /> Open
+          </a>
+        )}
+      </div>
+      <div className="mt-2 flex items-center gap-2 pl-10">
+        <input
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="Paste your post link"
+          className="w-full rounded-lg border-2 border-ink bg-screen px-3 py-1.5 text-xs font-semibold outline-none placeholder:text-ink-soft focus:ring-2 focus:ring-pink"
+        />
+        <Button size="sm" variant="blue" disabled={busy || !url.trim()} onClick={submit}>
+          Submit
+        </Button>
+      </div>
+      {err && <p className="mt-1 pl-10 text-xs text-red">{err}</p>}
     </div>
   );
 }

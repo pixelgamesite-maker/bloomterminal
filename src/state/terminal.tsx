@@ -27,6 +27,8 @@ import {
   pushEligibility,
   saveCompletedTasks,
   loadCompletedTasks,
+  loadTaskLinks,
+  saveTaskLink,
   loadWorker,
   insertWorker,
   updateWorkerStatus,
@@ -54,6 +56,8 @@ interface TerminalState {
   invites: InviteRow[];
   /** Handle of whoever referred this user (null if not referred). */
   referredBy: string | null;
+  /** Links the user submitted for tasks (quote/comment post URLs). */
+  taskLinks: Record<string, string>;
   worker: Worker | null;
   nftMinted: boolean;
   claimedTotal: number;
@@ -81,6 +85,8 @@ interface TerminalValue extends TerminalState {
   refreshInvites: () => void;
   /** Attribute a referral from a typed code (the inviter's handle). */
   applyReferralCode: (code: string) => Promise<{ ok: boolean; error?: string }>;
+  /** Submit a post link for a task (quote/comment); marks it done. */
+  submitTaskLink: (id: string, url: string) => Promise<{ ok: boolean; error?: string }>;
   createWorker: (cfg: {
     cls: WorkerClass;
     kind: MarketKind;
@@ -108,6 +114,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     missions: INITIAL_MISSIONS,
     invites: [],
     referredBy: null,
+    taskLinks: {},
     worker: null,
     nftMinted: false,
     claimedTotal: 0,
@@ -127,10 +134,11 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         setState((s) => ({ ...s, xConnected: false, userId: null, handle: null, avatar: null, authLoading: false }));
         return;
       }
-      const [profile, worker, completed] = await Promise.all([
+      const [profile, worker, completed, taskLinks] = await Promise.all([
         loadProfile(userId),
         loadWorker(userId),
         loadCompletedTasks(userId),
+        loadTaskLinks(userId),
       ]);
       const handle =
         profile?.x_username ??
@@ -151,6 +159,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
         address: profile?.wallet_address ?? s.address,
         // Restore saved progress so tasks + agent don't reappear on refresh.
         missions: s.missions.map((m) => (completed.includes(m.id) ? { ...m, done: true } : m)),
+        taskLinks,
         worker: worker ?? s.worker,
       }));
 
@@ -257,6 +266,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       missions: INITIAL_MISSIONS,
       invites: [],
       referredBy: null,
+      taskLinks: {},
       worker: null,
       nftMinted: false,
       claimedTotal: 0,
@@ -283,6 +293,26 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       if (supabase && s.userId) loadInvites(s.userId).then((invites) => setState((p) => ({ ...p, invites })));
       return s;
     });
+  }, []);
+
+  const submitTaskLink = useCallback(async (id: string, url: string) => {
+    const clean = url.trim();
+    if (!/^https?:\/\/(x\.com|twitter\.com)\/[^/]+\/status\/\d+/i.test(clean)) {
+      return { ok: false, error: "Paste a valid X post link." };
+    }
+    setState((s) => {
+      const missions = s.missions.map((m) => (m.id === id ? { ...m, done: true } : m));
+      const taskLinks = { ...s.taskLinks, [id]: clean };
+      if (supabase && s.userId) {
+        const keys = missions
+          .filter((m) => m.done && m.id !== "bind-wallet" && m.id !== "invite-agents")
+          .map((m) => m.id);
+        saveCompletedTasks(s.userId, keys);
+        saveTaskLink(s.userId, id, clean);
+      }
+      return { ...s, missions, taskLinks };
+    });
+    return { ok: true };
   }, []);
 
   const applyReferralCode = useCallback(async (code: string) => {
@@ -404,6 +434,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
       completeMission,
       refreshInvites,
       applyReferralCode,
+      submitTaskLink,
       createWorker,
       deployWorker,
       pauseWorker,
@@ -420,6 +451,7 @@ export function TerminalProvider({ children }: { children: ReactNode }) {
     completeMission,
     refreshInvites,
     applyReferralCode,
+    submitTaskLink,
     createWorker,
     deployWorker,
     pauseWorker,
