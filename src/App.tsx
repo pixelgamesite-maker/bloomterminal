@@ -7,6 +7,7 @@ import Landing from "@/pages/Landing";
 import Console from "@/pages/Console";
 import Watcher from "@/pages/Watcher";
 import Rental from "@/pages/Rental";
+import Claim from "@/pages/Claim";
 import Join from "@/pages/Join";
 import { LOGO } from "@/lib/art";
 
@@ -35,6 +36,8 @@ export default function App() {
             {/* Public, no X auth needed */}
             <Route path="/watcher" element={<Watcher />} />
             <Route path="/rental" element={<Rental />} />
+            {/* Public claim page, intentionally not in the menu */}
+            <Route path="/claim" element={<Claim />} />
             <Route
               path="/app"
               element={
