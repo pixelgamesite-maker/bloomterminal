@@ -50,31 +50,54 @@ export interface Community {
   img: string;
 }
 
+// Display names match the real community names in the allowlist sheet.
 export const COMMUNITIES: Community[] = [
   { name: "Argonauts", img: "/communities/Argonauts.AVIF" },
-  { name: "Blokyz", img: "/communities/Blokyz.AVIF" },
-  { name: "Clay", img: "/communities/Clay.AVIF" },
+  { name: "Clay Stonkz", img: "/communities/Clay.AVIF" },
   { name: "Crawlers", img: "/communities/Crawlers.AVIF" },
   { name: "Credits", img: "/communities/Credits.AVIF" },
-  { name: "Farming", img: "/communities/Farming.AVIF" },
+  { name: "Farming Season", img: "/communities/Farming.AVIF" },
   { name: "Fugz", img: "/communities/Fugz.AVIF" },
-  { name: "God", img: "/communities/God.AVIF" },
-  { name: "Gremlin", img: "/communities/Gremlin.WEBP" },
-  { name: "Internet", img: "/communities/Internet.AVIF" },
-  { name: "MonkeyHood", img: "/communities/MonkeyHood.AVIF" },
-  { name: "Mutual", img: "/communities/Mutual.PNG" },
-  { name: "Normies", img: "/communities/Normies.AVIF" },
+  { name: "God Pull", img: "/communities/God.AVIF" },
+  { name: "Gremlin Cartel", img: "/communities/Gremlin.WEBP" },
+  { name: "Internet Monkes", img: "/communities/Internet.AVIF" },
+  { name: "Monkey Hood", img: "/communities/MonkeyHood.AVIF" },
+  { name: "NPC", img: "/communities/Normies.AVIF" },
+  { name: "Original Blokyz", img: "/communities/Blokyz.AVIF" },
   { name: "Pyopyopyopyo", img: "/communities/Pyopyopyopyo.AVIF" },
   { name: "Quotrons", img: "/communities/Quotrons.AVIF" },
-  { name: "Rare", img: "/communities/Rare.AVIF" },
-  { name: "Rekt", img: "/communities/Rekt.WEBP" },
-  { name: "Slippy", img: "/communities/Slippy.AVIF" },
+  { name: "Rare Friends", img: "/communities/Rare.AVIF" },
+  { name: "Rekt Tradooor", img: "/communities/Rekt.WEBP" },
+  { name: "Slippy Club", img: "/communities/Slippy.AVIF" },
+  { name: "The Mutual Fun", img: "/communities/Mutual.PNG" },
   { name: "Vaultlings", img: "/communities/Vaultlings.AVIF" },
-  { name: "Yield", img: "/communities/Yield.AVIF" },
+  { name: "Yield Field Deeds", img: "/communities/Yield.AVIF" },
 ];
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
 const byKey = new Map(COMMUNITIES.map((c) => [norm(c.name), c]));
+
+// Also resolve the short forms (and a couple of spelling variants) in case a
+// name comes back trimmed differently from the sheet.
+const ALIASES: Record<string, string> = {
+  blokyz: "Original Blokyz",
+  clay: "Clay Stonkz",
+  farming: "Farming Season",
+  god: "God Pull",
+  gremlin: "Gremlin Cartel",
+  internet: "Internet Monkes",
+  monkeyhood: "Monkey Hood",
+  normies: "NPC",
+  rare: "Rare Friends",
+  rekt: "Rekt Tradooor",
+  slippy: "Slippy Club",
+  mutual: "The Mutual Fun",
+  yield: "Yield Field Deeds",
+};
+for (const [alias, canonical] of Object.entries(ALIASES)) {
+  const c = byKey.get(norm(canonical));
+  if (c) byKey.set(alias, c);
+}
 
 /** Image + canonical name for a community name coming back from the RPC. */
 export function communityOf(name: string): Community {
