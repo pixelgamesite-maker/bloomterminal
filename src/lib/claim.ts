@@ -24,24 +24,51 @@ export interface ClaimStats {
 
 export const EVM_RE = /^0x[0-9a-fA-F]{40}$/;
 
+// Turn a Supabase/network failure into something a human can act on.
+function explain(error: { message?: string; code?: string } | null): string {
+  const m = (error?.message ?? "").toLowerCase();
+  if (m.includes("failed to fetch") || m.includes("networkerror") || m.includes("load failed")) {
+    return "Can't reach the server. The claim backend may be paused or blocked, try again shortly, or in a browser without ad/privacy blockers.";
+  }
+  if ((error?.code ?? "") === "PGRST202" || m.includes("could not find the function")) {
+    return "Claim isn't set up yet on the server. (claim.sql hasn't been run.)";
+  }
+  if (m.includes("permission denied")) {
+    return "The claim backend isn't open to the public yet (permissions).";
+  }
+  return error?.message ?? "Something went wrong.";
+}
+
 export async function claimStats(): Promise<ClaimStats> {
   if (!supabase) return { taken: 0, total: 1000, remaining: 1000 };
-  const { data } = await supabase.rpc("claim_stats");
-  return (data as ClaimStats) ?? { taken: 0, total: 1000, remaining: 1000 };
+  try {
+    const { data } = await supabase.rpc("claim_stats");
+    return (data as ClaimStats) ?? { taken: 0, total: 1000, remaining: 1000 };
+  } catch {
+    return { taken: 0, total: 1000, remaining: 1000 };
+  }
 }
 
 export async function claimCheck(wallet: string): Promise<ClaimResult> {
   if (!supabase) return { ok: false, error: "Claim isn't configured yet." };
-  const { data, error } = await supabase.rpc("claim_check", { p_wallet: wallet });
-  if (error) return { ok: false, error: error.message };
-  return (data as ClaimResult) ?? { ok: false, error: "No response." };
+  try {
+    const { data, error } = await supabase.rpc("claim_check", { p_wallet: wallet });
+    if (error) return { ok: false, error: explain(error) };
+    return (data as ClaimResult) ?? { ok: false, error: "No response." };
+  } catch (e) {
+    return { ok: false, error: explain({ message: String(e) }) };
+  }
 }
 
 export async function claimSpot(wallet: string): Promise<ClaimResult> {
   if (!supabase) return { ok: false, error: "Claim isn't configured yet." };
-  const { data, error } = await supabase.rpc("claim_spot", { p_wallet: wallet });
-  if (error) return { ok: false, error: error.message };
-  return (data as ClaimResult) ?? { ok: false, error: "No response." };
+  try {
+    const { data, error } = await supabase.rpc("claim_spot", { p_wallet: wallet });
+    if (error) return { ok: false, error: explain(error) };
+    return (data as ClaimResult) ?? { ok: false, error: "No response." };
+  } catch (e) {
+    return { ok: false, error: explain({ message: String(e) }) };
+  }
 }
 
 // ---- communities (images live in /public/communities) ----
