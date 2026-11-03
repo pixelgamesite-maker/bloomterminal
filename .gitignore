@@ -13,3 +13,4 @@ npm-debug.log*
 .vscode/*
 !.vscode/extensions.json
 claim_allowlist_clean.csv
+claim_allowlist_pyo_god_append.csv
