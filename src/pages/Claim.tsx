@@ -62,7 +62,8 @@ export default function Claim() {
       return;
     }
     setResult(res);
-    setDone(true);
+    // res.claimed = just claimed now; res.already = it was already claimed.
+    setDone(Boolean(res.claimed));
     if (res.taken != null && res.total != null && res.remaining != null) {
       setStats({ taken: res.taken, total: res.total, remaining: res.remaining });
     }
@@ -199,8 +200,12 @@ function ResultCard({
   onClaim: () => void;
 }) {
   const comms = (result.communities ?? []).map((n) => communityOf(n));
-  const eligible = Boolean(result.eligible);
-  const alreadyClaimed = Boolean(result.claimed) && !done;
+  // claim_spot responses carry no `eligible` flag, so treat a claim/already
+  // result (which only comes back for eligible wallets) as eligible too.
+  const eligible = Boolean(
+    result.eligible || result.claimed || result.already || done || comms.length > 0
+  );
+  const alreadyClaimed = Boolean(result.already || (result.claimed && !done));
 
   if (!eligible) {
     return (
