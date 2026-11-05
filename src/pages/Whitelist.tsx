@@ -5,6 +5,7 @@ import {
   ExternalLink,
   Loader2,
   Sparkles,
+  Heart,
   Quote,
   MessageCircle,
   Wallet,
@@ -18,6 +19,7 @@ import { submitWhitelist, X_LINK_RE, EVM_RE } from "@/lib/whitelist";
 const LS_KEY = "bloom_whitelist_v1";
 
 interface Saved {
+  liked?: boolean;
   quote?: string;
   comment?: string;
   submitted?: boolean;
@@ -42,7 +44,8 @@ export default function Whitelist() {
   const [quote, setQuote] = useState("");
   const [comment, setComment] = useState("");
   const [wallet, setWallet] = useState("");
-  // which steps are locked-in (completed): 0 = quote, 1 = comment
+  // which steps are locked-in (completed)
+  const [liked, setLiked] = useState(false);
   const [quoteDone, setQuoteDone] = useState(false);
   const [commentDone, setCommentDone] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -56,6 +59,7 @@ export default function Whitelist() {
       setSubmitted(true);
       return;
     }
+    if (s.liked) setLiked(true);
     if (s.quote) {
       setQuote(s.quote);
       setQuoteDone(true);
@@ -65,6 +69,11 @@ export default function Whitelist() {
       setCommentDone(true);
     }
   }, []);
+
+  function doLike() {
+    setLiked(true);
+    save({ ...load(), liked: true });
+  }
 
   function doQuote() {
     setErr(null);
@@ -123,35 +132,53 @@ export default function Whitelist() {
   return (
     <Shell>
       <p className="mx-auto mt-2 max-w-md text-center text-sm text-ink-soft">
-        Finish each step to unlock the next. Quote the post, comment and tag 2 frens, then
-        drop your wallet.
+        Finish each step to unlock the next. Like the post, quote it, comment and tag 2
+        frens, then drop your wallet.
       </p>
 
       <div className="mt-6 space-y-3">
-        {/* Step 1 — Quote */}
+        {/* Step 1 — Like */}
         <Step
           n={1}
+          icon={<Heart size={15} />}
+          title="Like the post"
+          desc="Like the pinned post, then confirm to unlock the next step."
+          state={liked ? "done" : "active"}
+          showPost={!liked}
+        >
+          {!liked && (
+            <Button variant="pink" className="mt-3 w-full sm:w-52" onClick={doLike}>
+              I've liked it
+            </Button>
+          )}
+        </Step>
+
+        {/* Step 2 — Quote */}
+        <Step
+          n={2}
           icon={<Quote size={15} />}
           title="Quote the post"
           desc="Quote the pinned post, then paste the link to your quote."
-          state={quoteDone ? "done" : "active"}
-          showPost
+          state={!liked ? "locked" : quoteDone ? "done" : "active"}
+          showPost={liked && !quoteDone}
         >
-          <SubmitBox
-            value={quote}
-            onChange={setQuote}
-            onSubmit={doQuote}
-            placeholder="https://x.com/you/status/..."
-            valid={X_LINK_RE.test(quote.trim())}
-            done={quoteDone}
-            err={err}
-            btnLabel="Submit quote"
-          />
+          {liked && (
+            <SubmitBox
+              value={quote}
+              onChange={setQuote}
+              onSubmit={doQuote}
+              placeholder="https://x.com/you/status/..."
+              valid={X_LINK_RE.test(quote.trim())}
+              done={quoteDone}
+              err={err}
+              btnLabel="Submit quote"
+            />
+          )}
         </Step>
 
-        {/* Step 2 — Comment */}
+        {/* Step 3 — Comment */}
         <Step
-          n={2}
+          n={3}
           icon={<MessageCircle size={15} />}
           title="Comment and tag 2 frens"
           desc="Comment on the post and tag 2 friends, then paste your comment link."
@@ -172,9 +199,9 @@ export default function Whitelist() {
           )}
         </Step>
 
-        {/* Step 3 — Wallet */}
+        {/* Step 4 — Wallet */}
         <Step
-          n={3}
+          n={4}
           icon={<Wallet size={15} />}
           title="Submit your wallet"
           desc="Paste the EVM wallet you want whitelisted."
