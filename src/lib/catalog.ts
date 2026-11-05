@@ -74,7 +74,7 @@ export const assetsForKind = (kind: MarketKind) =>
 export const X_HANDLE = "BloomTerminall";
 export const X_URL = "https://x.com/BloomTerminall";
 export const X_POST_URL = "https://x.com/bloomterminall/status/2111822332264337750";
-export const WL_POST_URL = "https://x.com/BloomTerminall/status/2118087723252953223";
+export const WL_POST_URL = "https://x.com/bloomterminall/status/2118364434704044353";
 
 // One-time tasks (order matters; bind-wallet is gated until the rest are done).
 export const INITIAL_MISSIONS: Mission[] = [
