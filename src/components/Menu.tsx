@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Menu as MenuIcon, X, Eye, Users, Ship, Twitter, Home, KeyRound, Gift } from "lucide-react";
+import { Menu as MenuIcon, X, Eye, Users, Ship, Twitter, Home, KeyRound, Gift, ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { LOGO } from "@/lib/art";
@@ -42,6 +42,7 @@ export function Menu({
     { label: "Home", icon: Home, onClick: go(() => navigate("/")) },
     { label: "Robinhood Watcher", icon: Eye, onClick: go(() => navigate("/watcher")) },
     { label: "Claim your spot", icon: Gift, onClick: go(() => navigate("/claim")) },
+    { label: "Whitelist", icon: ClipboardList, onClick: go(() => navigate("/whitelist")) },
     { label: "Rental", icon: KeyRound, soon: true, onClick: go(() => navigate("/rental")) },
     {
       label: "Holders DEX",

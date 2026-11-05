@@ -8,6 +8,7 @@ import Console from "@/pages/Console";
 import Watcher from "@/pages/Watcher";
 import Rental from "@/pages/Rental";
 import Claim from "@/pages/Claim";
+import Whitelist from "@/pages/Whitelist";
 import Join from "@/pages/Join";
 import { LOGO } from "@/lib/art";
 
@@ -38,6 +39,8 @@ export default function App() {
             <Route path="/rental" element={<Rental />} />
             {/* Public claim page, intentionally not in the menu */}
             <Route path="/claim" element={<Claim />} />
+            {/* Public whitelist application, no X auth needed */}
+            <Route path="/whitelist" element={<Whitelist />} />
             <Route
               path="/app"
               element={
