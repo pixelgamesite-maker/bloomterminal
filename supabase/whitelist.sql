@@ -27,34 +27,34 @@ alter table public.whitelist enable row level security;
 -- no policies: reach this only through submit_whitelist() below.
 
 -- Submit (or update) an application. Public: granted to anon. Validates the
--- handle, wallet and both links server-side. Re-submitting with the same X
--- handle overwrites that handle's row.
+-- wallet and both links server-side, and derives the X handle from the quote
+-- link (https://x.com/<handle>/status/...). Re-submitting with the same handle
+-- overwrites that handle's row.
 create or replace function public.submit_whitelist(
-  p_handle  text,
   p_wallet  text,
   p_quote   text,
   p_comment text
 )
 returns jsonb language plpgsql security definer set search_path = public volatile as $$
 declare
-  h  text := lower(btrim(regexp_replace(coalesce(p_handle, ''), '^@+', '')));
   w  text := lower(btrim(coalesce(p_wallet, '')));
   q  text := btrim(coalesce(p_quote, ''));
   c  text := btrim(coalesce(p_comment, ''));
   re text := '^https?://(x\.com|twitter\.com)/[^/]+/status/[0-9]+';
+  h  text;
 begin
-  if length(h) = 0 then
-    return jsonb_build_object('ok', false, 'error', 'Enter your X username.');
-  end if;
-  if w !~ '^0x[0-9a-f]{40}$' then
-    return jsonb_build_object('ok', false, 'error', 'Enter a valid wallet address (0x + 40 hex).');
-  end if;
   if q !~* re then
     return jsonb_build_object('ok', false, 'error', 'Your quote link must be a valid X post URL.');
   end if;
   if c !~* re then
     return jsonb_build_object('ok', false, 'error', 'Your comment link must be a valid X post URL.');
   end if;
+  if w !~ '^0x[0-9a-f]{40}$' then
+    return jsonb_build_object('ok', false, 'error', 'Enter a valid wallet address (0x + 40 hex).');
+  end if;
+
+  -- pull the applicant's handle out of their quote link
+  h := lower(substring(q from 'https?://(?:x\.com|twitter\.com)/([^/]+)/status'));
 
   insert into public.whitelist (x_username, wallet_address, quote_link, comment_link)
   values (h, w, q, c)
@@ -67,7 +67,7 @@ begin
   return jsonb_build_object('ok', true);
 end $$;
 
-grant execute on function public.submit_whitelist(text, text, text, text) to anon, authenticated;
+grant execute on function public.submit_whitelist(text, text, text) to anon, authenticated;
 
 -- ----------------------------------------------------------------------
 -- Admin: pull every application, run in the SQL editor whenever you want it.

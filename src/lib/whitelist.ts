@@ -8,20 +8,18 @@ export const X_LINK_RE = /^https?:\/\/(x\.com|twitter\.com)\/[^/]+\/status\/\d+/
 export const EVM_RE = /^0x[0-9a-fA-F]{40}$/;
 
 export interface WhitelistInput {
-  handle: string;
   wallet: string;
   quote: string;
   comment: string;
 }
 
-/** Submit (or update) an application. Public, no auth. */
+/** Submit the application. Public, no auth. Handle is derived from the quote link. */
 export async function submitWhitelist(
   i: WhitelistInput
 ): Promise<{ ok: boolean; error?: string }> {
   if (!supabase) return { ok: false, error: "Not connected." };
   try {
     const { data, error } = await supabase.rpc("submit_whitelist", {
-      p_handle: i.handle.trim(),
       p_wallet: i.wallet.trim(),
       p_quote: i.quote.trim(),
       p_comment: i.comment.trim(),
